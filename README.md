@@ -1,9 +1,8 @@
 # sql-synth-agentic-playground
 
-<!-- IMPORTANT: Replace 'your-github-username-or-org' with your actual GitHub details -->
-[![Build Status](https://img.shields.io/github/actions/workflow/status/your-github-username-or-org/sql-synth-agentic-playground/ci.yml?branch=main)](https://github.com/your-github-username-or-org/sql-synth-agentic-playground/actions)
-[![Coverage Status](https://img.shields.io/coveralls/github/your-github-username-or-org/sql-synth-agentic-playground)](https://coveralls.io/github/your-github-username-or-org/sql-synth-agentic-playground)
-[![License](https://img.shields.io/github/license/your-github-username-or-org/sql-synth-agentic-playground)](LICENSE)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/danieleschmidt/sql-synth-agentic-playground/ci.yml?branch=main)](https://github.com/danieleschmidt/sql-synth-agentic-playground/actions)
+[![Coverage Status](https://img.shields.io/coveralls/github/danieleschmidt/sql-synth-agentic-playground)](https://coveralls.io/github/danieleschmidt/sql-synth-agentic-playground)
+[![License](https://img.shields.io/github/license/danieleschmidt/sql-synth-agentic-playground)](LICENSE)
 [![Version](https://img.shields.io/badge/version-v0.1.0-blue)](https://semver.org)
 
 An interactive playground for an agent that translates natural language queries into SQL. This project adds a comprehensive evaluation framework against standard benchmarks like Spider and WikiSQL, served via a Streamlit UI.
@@ -39,7 +38,7 @@ We welcome contributions! Please see our organization-wide `CONTRIBUTING.md` and
 
 ## 📝 License
 
-This project is licensed under the Apache-2.0 License. The Spider dataset is licensed under CC BY-SA 4.0.
+This project is licensed under the MIT License. The Spider dataset is licensed under CC BY-SA 4.0.
 
 ## 📚 References
 

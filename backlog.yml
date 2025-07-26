@@ -1,0 +1,265 @@
+backlog_items:
+  - id: "B001"
+    title: "Set up Python project structure and dependencies"
+    type: "infrastructure"
+    description: "Create basic Python project structure with requirements.txt, setup core dependencies for SQL synthesis agent"
+    acceptance_criteria:
+      - "requirements.txt file with core dependencies (streamlit, langchain, sql libraries)"
+      - "Basic directory structure (src/, tests/, docs/)"
+      - "Environment configuration setup (.env.example)"
+    effort: 3
+    value: 8
+    time_criticality: 8
+    risk_reduction: 5
+    status: "DONE"
+    risk_tier: "LOW"
+    created_at: "2025-01-26"
+    completed_at: "2025-01-26"
+    links: []
+
+  - id: "B002"
+    title: "Create core SQL synthesis agent"
+    type: "feature"
+    description: "Implement the main agent that translates natural language queries into SQL using LangChain"
+    acceptance_criteria:
+      - "Agent class with natural language to SQL conversion capability"
+      - "Integration with LangChain SQL Agent Toolkit"
+      - "Support for parameterized queries to prevent SQL injection"
+      - "Basic error handling and validation"
+    effort: 8
+    value: 13
+    time_criticality: 13
+    risk_reduction: 8
+    status: "NEW"
+    risk_tier: "MEDIUM"  
+    created_at: "2025-01-26"
+    links: ["https://api.python.langchain.com/en/latest/agents/langchain_community.agent_toolkits.sql.base.create_sql_agent.html"]
+
+  - id: "B003"
+    title: "Implement Streamlit UI interface"
+    type: "feature"
+    description: "Create interactive Streamlit app for demonstrating the SQL synthesis agent"
+    acceptance_criteria:
+      - "app.py file with Streamlit interface"
+      - "Input field for natural language queries"
+      - "Display of generated SQL queries"
+      - "Query execution results display"
+      - "Error handling and user feedback"
+    effort: 5
+    value: 8
+    time_criticality: 8
+    risk_reduction: 3
+    status: "NEW"
+    risk_tier: "LOW"
+    created_at: "2025-01-26"
+    links: []
+
+  - id: "B004"
+    title: "Database connection and configuration"
+    type: "infrastructure"
+    description: "Set up database connectivity with environment-based configuration"
+    acceptance_criteria:
+      - "Database connection management"
+      - "Environment variable configuration for DB credentials"
+      - "Support for multiple SQL dialects"
+      - "Connection testing and validation"
+    effort: 5
+    value: 8
+    time_criticality: 5
+    risk_reduction: 8
+    status: "NEW"
+    risk_tier: "LOW"
+    created_at: "2025-01-26"
+    links: []
+
+  - id: "B005"
+    title: "Spider benchmark integration"
+    type: "feature"
+    description: "Integrate Spider dataset for evaluation and benchmarking"
+    acceptance_criteria:
+      - "Spider dataset download and setup"
+      - "Evaluation framework against Spider benchmark"
+      - "Accuracy metrics and reporting"
+      - "Docker volume caching for fast CI runs"
+    effort: 8
+    value: 8
+    time_criticality: 5
+    risk_reduction: 3
+    status: "NEW"
+    risk_tier: "LOW"
+    created_at: "2025-01-26"
+    links: ["https://arxiv.org/abs/1809.08887"]
+
+  - id: "B006"
+    title: "WikiSQL benchmark integration"
+    type: "feature"
+    description: "Integrate WikiSQL dataset for additional evaluation"
+    acceptance_criteria:
+      - "WikiSQL dataset download and setup"
+      - "Evaluation framework against WikiSQL benchmark"
+      - "Accuracy metrics and comparison with Spider"
+      - "Docker volume caching integration"
+    effort: 5
+    value: 5
+    time_criticality: 3
+    risk_reduction: 2
+    status: "NEW"
+    risk_tier: "LOW"
+    created_at: "2025-01-26"
+    links: []
+
+  - id: "B007"
+    title: "Docker containerization and benchmark database setup"
+    type: "infrastructure"
+    description: "Create Docker setup for benchmark databases with volume caching"
+    acceptance_criteria:
+      - "docker-compose.yml with benchmark-db service"
+      - "Volume caching for Spider/WikiSQL databases"
+      - "Fast CI benchmark runs"
+      - "Database initialization scripts"
+    effort: 5
+    value: 5
+    time_criticality: 3
+    risk_reduction: 5
+    status: "NEW"
+    risk_tier: "LOW"
+    created_at: "2025-01-26"
+    links: []
+
+  - id: "B008"
+    title: "SQL dialect support and connector selection"
+    type: "feature"
+    description: "Implement support for different SQL dialects with appropriate connectors"
+    acceptance_criteria:
+      - "Dialect detection and selection mechanism"
+      - "Support for Snowflake (double-quoted identifiers, ILIKE)"
+      - "PostgreSQL, MySQL, SQLite connector support"
+      - "Dialect-specific query generation"
+    effort: 8
+    value: 5
+    time_criticality: 2
+    risk_reduction: 3
+    status: "NEW"
+    risk_tier: "MEDIUM"
+    created_at: "2025-01-26"
+    links: []
+
+  - id: "B009"
+    title: "Security implementation - SQL injection prevention"
+    type: "security"
+    description: "Implement comprehensive SQL injection prevention measures"
+    acceptance_criteria:
+      - "All queries use parameterized bindings"
+      - "Input validation and sanitization"
+      - "No direct string formatting of user input into SQL"
+      - "Security testing and validation"
+    effort: 5
+    value: 13
+    time_criticality: 8
+    risk_reduction: 13
+    status: "NEW"
+    risk_tier: "HIGH"
+    created_at: "2025-01-26"
+    links: []
+
+  - id: "B010"
+    title: "Test suite implementation"
+    type: "testing"
+    description: "Create comprehensive test suite with unit and integration tests"
+    acceptance_criteria:
+      - "Unit tests for SQL synthesis agent"
+      - "Integration tests with benchmark datasets"
+      - "Test coverage reporting"
+      - "Automated test execution in CI"
+    effort: 8
+    value: 8
+    time_criticality: 5
+    risk_reduction: 8
+    status: "NEW"
+    risk_tier: "LOW"
+    created_at: "2025-01-26"
+    links: []
+
+  - id: "B011"
+    title: "CI/CD pipeline setup"
+    type: "infrastructure"
+    description: "Set up GitHub Actions for continuous integration"
+    acceptance_criteria:
+      - "GitHub Actions workflow file"
+      - "Automated testing on PR/push"
+      - "Coverage reporting integration"
+      - "Build status badges working"
+    effort: 5
+    value: 5
+    time_criticality: 5
+    risk_reduction: 5
+    status: "NEW"
+    risk_tier: "LOW"
+    created_at: "2025-01-26"
+    links: []
+
+  - id: "B012"
+    title: "Fix README GitHub username placeholders"
+    type: "documentation"
+    description: "Replace placeholder GitHub username/org in README badges and links"
+    acceptance_criteria:
+      - "All 'your-github-username-or-org' placeholders replaced"
+      - "Working badge links"
+      - "Correct repository references"
+    effort: 1
+    value: 2
+    time_criticality: 1
+    risk_reduction: 1
+    status: "DONE"
+    risk_tier: "LOW"
+    created_at: "2025-01-26"
+    completed_at: "2025-01-26"
+    links: []
+
+  - id: "B013"
+    title: "License discrepancy fix"
+    type: "documentation"
+    description: "Fix discrepancy between README (Apache-2.0) and LICENSE file (MIT)"
+    acceptance_criteria:
+      - "Consistent license across README and LICENSE file"
+      - "Decision on which license to use"
+      - "Updated license headers if needed"
+    effort: 2
+    value: 3
+    time_criticality: 2
+    risk_reduction: 2
+    status: "DONE"
+    risk_tier: "LOW"
+    created_at: "2025-01-26"
+    completed_at: "2025-01-26"
+    links: []
+
+  - id: "B014"
+    title: "Create CHANGELOG.md"
+    type: "documentation"
+    description: "Create and maintain CHANGELOG file as mentioned in README"
+    acceptance_criteria:
+      - "CHANGELOG.md file following keepachangelog format"
+      - "Initial version entry"
+      - "Template for future releases"
+    effort: 2
+    value: 2
+    time_criticality: 1
+    risk_reduction: 1
+    status: "DONE"
+    risk_tier: "LOW"
+    created_at: "2025-01-26"
+    completed_at: "2025-01-26"
+    links: []
+
+metadata:
+  last_updated: "2025-01-26T00:00:00Z"
+  total_items: 14
+  status_counts:
+    NEW: 9
+    READY: 0
+    REFINED: 0
+    DOING: 0
+    PR: 0
+    DONE: 4
+    BLOCKED: 0
