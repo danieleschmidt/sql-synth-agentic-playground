@@ -1,38 +1,37 @@
-# agentic-startup-studio-boilerplate
+# sql-synth-agentic-playground
 
 <!-- IMPORTANT: Replace 'your-github-username-or-org' with your actual GitHub details -->
-[![Build Status](https://img.shields.io/github/actions/workflow/status/your-github-username-or-org/agentic-startup-studio-boilerplate/ci.yml?branch=main)](https://github.com/your-github-username-or-org/agentic-startup-studio-boilerplate/actions)
-[![Coverage Status](https://img.shields.io/coveralls/github/your-github-username-or-org/agentic-startup-studio-boilerplate)](https://coveralls.io/github/your-github-username-or-org/agentic-startup-studio-boilerplate)
-[![License](https://img.shields.io/github/license/your-github-username-or-org/agentic-startup-studio-boilerplate)](LICENSE)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/your-github-username-or-org/sql-synth-agentic-playground/ci.yml?branch=main)](https://github.com/your-github-username-or-org/sql-synth-agentic-playground/actions)
+[![Coverage Status](https://img.shields.io/coveralls/github/your-github-username-or-org/sql-synth-agentic-playground)](https://coveralls.io/github/your-github-username-or-org/sql-synth-agentic-playground)
+[![License](https://img.shields.io/github/license/your-github-username-or-org/sql-synth-agentic-playground)](LICENSE)
 [![Version](https://img.shields.io/badge/version-v0.1.0-blue)](https://semver.org)
 
-A Cookiecutter template for rapidly building agentic startups. It provides a reusable skeleton that wires together CrewAI, FastAPI, and a React frontend with Shadcn UI components.
+An interactive playground for an agent that translates natural language queries into SQL. This project adds a comprehensive evaluation framework against standard benchmarks like Spider and WikiSQL, served via a Streamlit UI.
 
 ## ✨ Key Features
 
-*   **Cookiecutter Template**: Quickly scaffold a new project with a standardized structure.
-*   **Integrated Tech Stack**: Wires together CrewAI, FastAPI, and React with Shadcn.
-*   **Pluggable Auth**: Includes an optional `docker-compose.keycloak.yml` stub for user authentication.
-*   **Infrastructure-as-Code**: Provides a `/iac` folder with Terraform scripts to provision the backend, database, and frontend bucket.
-*   **DX Polish**: A single `dev up` script spins up the entire development environment using Docker Compose.
+*   **Natural Language to SQL**: An agent capable of generating complex SQL queries from natural language prompts.
+*   **Comprehensive Evaluation**: Evaluates accuracy against the Spider and WikiSQL benchmarks.
+*   **Interactive UI**: A Streamlit interface for demonstrating and interacting with the agent.
+*   **SQL Dialect Support**: The agent can select connectors for different dialects. Test cases should account for quirks (e.g., Snowflake's double-quoted identifiers and `ILIKE`).
+*   **Fast CI Runs**: Caches the Spider/WikiSQL databases in a Docker volume to ensure benchmark runs are consistently fast.
 
-## ⚠️ Important Notes
+## 🔐 Security
 
-*   **Terraform State**: For multi-developer environments, you MUST configure remote state for Terraform (e.g., using an S3 bucket and DynamoDB lock table) to prevent conflicts. The default local state is for single-developer use only.
-*   **Authentication**: To enable auth, uncomment the Keycloak service in the main `docker-compose.yml` and follow the [Keycloak quick-start guide](https://www.keycloak.org/getting-started/getting-started-docker) for setup.
+**SQL Injection Guard**: All generated queries use parameterized bindings to prevent SQL injection vulnerabilities. Direct string formatting of user input into SQL queries is strictly forbidden. For reporting vulnerabilities, please refer to our organization's `SECURITY.md` file.
 
 ## ⚡ Quick Start
 
-1.  Install Cookiecutter: `pip install cookiecutter`
-2.  Generate a new project: `cookiecutter gh:your-github-username-or-org/agentic-startup-studio-boilerplate`
-3.  `cd my-new-app`
-4.  Start the development environment: `./dev up`
+1.  Clone the repository and install dependencies: `pip install -r requirements.txt`.
+2.  Set up your database connection in a `.env` file.
+3.  Cache the benchmark databases: `docker compose up -d benchmark-db`.
+4.  Run the Streamlit app: `streamlit run app.py`.
 
 ## 📈 Roadmap
 
-*   **v0.1.0**: Basic template with CrewAI, FastAPI, React, IaC, and dev script.
-*   **v0.2.0**: Addition of more sophisticated venture scoring logic examples.
-*   **v0.3.0**: Integration with other startup tools like Stripe for payments.
+*   **v0.1.0**: Core SQL generation agent and Streamlit UI.
+*   **v0.2.0**: Integration of the Spider and WikiSQL evaluation benchmarks.
+*   **v0.3.0**: Support for more complex SQL features and database dialects.
 
 ## 🤝 Contributing
 
@@ -40,4 +39,9 @@ We welcome contributions! Please see our organization-wide `CONTRIBUTING.md` and
 
 ## 📝 License
 
-This project is licensed under the Apache-2.0 License.
+This project is licensed under the Apache-2.0 License. The Spider dataset is licensed under CC BY-SA 4.0.
+
+## 📚 References
+
+*   **Spider Dataset**: [arXiv:1809.08887](https://arxiv.org/abs/1809.08887)
+*   **LangChain SQL Tool API**: [SQL Agent Toolkit Reference](https://api.python.langchain.com/en/latest/agents/langchain_community.agent_toolkits.sql.base.create_sql_agent.html)```
