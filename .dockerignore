@@ -1,0 +1,140 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+README.md
+CHANGELOG.md
+LICENSE
+docs/
+*.md
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# Cache
+.cache/
+.ruff_cache/
+.mypy_cache/
+.black_cache/
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Application specific
+data/
+logs/
+tmp/
+*.db
+*.sqlite
+*.sqlite3
+
+# Benchmark datasets (large files)
+spider/
+wikisql/
+benchmark-data/
+
+# Model files
+models/
+*.pkl
+*.joblib
+*.model
+
+# Backup files
+backups/
+archives/
+*.bak
+*.backup
+
+# Security
+*.pem
+*.key
+*.crt
+*.p12
+secrets.txt
+secrets.json
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+.circleci/
+
+# Package manager
+node_modules/
+package-lock.json
+yarn.lock
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+
+# Development tools
+.pre-commit-config.yaml
+.editorconfig
+
+# Monitoring
+metrics/
+traces/
+monitoring_data/
