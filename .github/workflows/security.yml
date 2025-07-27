@@ -1,0 +1,461 @@
+name: Security Scanning
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run security scans daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  # CodeQL Analysis
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'python', 'javascript' ]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v2
+      with:
+        languages: ${{ matrix.language }}
+        queries: +security-and-quality
+
+    - name: Setup Python
+      if: matrix.language == 'python'
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install Python dependencies
+      if: matrix.language == 'python'
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .[dev]
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v2
+      with:
+        category: "/language:${{matrix.language}}"
+
+  # Dependency Vulnerability Scanning
+  dependency-scan:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .[dev]
+
+    - name: Run pip-audit
+      run: |
+        pip-audit --format=json --output=pip-audit-report.json
+        pip-audit --format=cyclonedx --output=pip-audit-sbom.json
+      continue-on-error: true
+
+    - name: Run Safety check
+      run: |
+        safety check --json --output=safety-report.json
+      continue-on-error: true
+
+    - name: Run Snyk Python scan
+      uses: snyk/actions/python@master
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      with:
+        args: --severity-threshold=medium --json-file-output=snyk-python-report.json
+      continue-on-error: true
+
+    - name: Upload vulnerability reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: dependency-vulnerability-reports
+        path: |
+          pip-audit-report.json
+          pip-audit-sbom.json
+          safety-report.json
+          snyk-python-report.json
+
+  # Static Application Security Testing (SAST)
+  sast-scan:
+    name: Static Application Security Testing
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install bandit[toml] semgrep
+
+    - name: Run Bandit security scan
+      run: |
+        bandit -r src/ -f json -o bandit-report.json
+        bandit -r src/ -f sarif -o bandit-results.sarif
+      continue-on-error: true
+
+    - name: Upload Bandit SARIF results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: bandit-results.sarif
+
+    - name: Run Semgrep scan
+      run: |
+        semgrep --config=auto --json --output=semgrep-report.json src/
+        semgrep --config=auto --sarif --output=semgrep-results.sarif src/
+      continue-on-error: true
+
+    - name: Upload Semgrep SARIF results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: semgrep-results.sarif
+
+    - name: Upload SAST reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: sast-reports
+        path: |
+          bandit-report.json
+          bandit-results.sarif
+          semgrep-report.json
+          semgrep-results.sarif
+
+  # Secret Scanning
+  secret-scan:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Full history for comprehensive secret scanning
+
+    - name: Run GitLeaks
+      uses: gitleaks/gitleaks-action@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE}}
+
+    - name: Run TruffleHog
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: ./
+        base: main
+        head: HEAD
+        extra_args: --debug --only-verified
+
+  # Infrastructure as Code Security
+  iac-scan:
+    name: Infrastructure Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run Checkov
+      id: checkov
+      uses: bridgecrewio/checkov-action@master
+      with:
+        directory: .
+        framework: dockerfile,docker_compose,yaml,github_actions
+        output_format: sarif
+        output_file_path: checkov-results.sarif
+        quiet: true
+        soft_fail: true
+
+    - name: Upload Checkov SARIF results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: checkov-results.sarif
+
+    - name: Run Trivy IaC scan
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'config'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-iac-results.sarif'
+
+    - name: Upload Trivy IaC SARIF results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: trivy-iac-results.sarif
+
+  # Container Security Scanning
+  container-scan:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.event_name == 'push' || github.event_name == 'schedule'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Build Docker image
+      run: |
+        docker build -t sql-synth-security-test:latest .
+
+    - name: Run Trivy container scan
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'sql-synth-security-test:latest'
+        format: 'sarif'
+        output: 'trivy-container-results.sarif'
+
+    - name: Upload Trivy container SARIF results
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: trivy-container-results.sarif
+
+    - name: Run Snyk container scan
+      uses: snyk/actions/docker@master
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      with:
+        image: sql-synth-security-test:latest
+        args: --severity-threshold=high --json-file-output=snyk-container-report.json
+      continue-on-error: true
+
+    - name: Upload container scan reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: container-security-reports
+        path: |
+          trivy-container-results.sarif
+          snyk-container-report.json
+
+  # License Compliance
+  license-scan:
+    name: License Compliance Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .[dev]
+        pip install pip-licenses licensecheck
+
+    - name: Generate license report
+      run: |
+        pip-licenses --format=json --output-file=licenses-pip.json
+        pip-licenses --format=csv --output-file=licenses-pip.csv
+        licensecheck --zero --output-file=licenses-check.json
+
+    - name: Check for forbidden licenses
+      run: |
+        # Define forbidden licenses (GPL variants that might conflict with MIT)
+        python -c "
+        import json
+        with open('licenses-pip.json') as f:
+            licenses = json.load(f)
+        
+        forbidden = ['GPL-3.0', 'GPL-2.0', 'AGPL-3.0', 'LGPL-3.0']
+        violations = [pkg for pkg in licenses if any(fb in pkg.get('License', '') for fb in forbidden)]
+        
+        if violations:
+            print('❌ License violations found:')
+            for pkg in violations:
+                print(f'  {pkg[\"Name\"]} ({pkg[\"Version\"]}): {pkg[\"License\"]}')
+            exit(1)
+        else:
+            print('✅ No license violations found')
+        "
+
+    - name: Upload license reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: license-reports
+        path: |
+          licenses-pip.json
+          licenses-pip.csv
+          licenses-check.json
+
+  # Security Policy Compliance
+  compliance-check:
+    name: Security Policy Compliance
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Check security policy files
+      run: |
+        echo "Checking for required security files..."
+        
+        # Check for SECURITY.md
+        if [ ! -f SECURITY.md ] && [ ! -f .github/SECURITY.md ]; then
+          echo "❌ SECURITY.md file not found"
+          exit 1
+        else
+          echo "✅ SECURITY.md found"
+        fi
+        
+        # Check for pre-commit config
+        if [ ! -f .pre-commit-config.yaml ]; then
+          echo "❌ .pre-commit-config.yaml not found"
+          exit 1
+        else
+          echo "✅ Pre-commit configuration found"
+        fi
+
+    - name: Validate security configuration
+      run: |
+        echo "Validating security configuration..."
+        
+        # Check if secrets are properly handled
+        if grep -r "password\|secret\|key" --include="*.py" --include="*.yml" --include="*.yaml" src/ | grep -v "_PLACEHOLDER\|example\|template"; then
+          echo "⚠️ Potential hardcoded secrets found in source code"
+        else
+          echo "✅ No hardcoded secrets detected"
+        fi
+
+  # Security Summary
+  security-summary:
+    name: Security Scan Summary
+    runs-on: ubuntu-latest
+    needs: [codeql, dependency-scan, sast-scan, secret-scan, iac-scan, license-scan, compliance-check]
+    if: always()
+
+    steps:
+    - name: Download all security reports
+      uses: actions/download-artifact@v3
+
+    - name: Generate security summary
+      run: |
+        echo "## 🔒 Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Scan Type | Status | Details |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----------|--------|---------|" >> $GITHUB_STEP_SUMMARY
+        echo "| CodeQL Analysis | ${{ needs.codeql.result }} | Static code analysis |" >> $GITHUB_STEP_SUMMARY
+        echo "| Dependency Scan | ${{ needs.dependency-scan.result }} | Vulnerability in dependencies |" >> $GITHUB_STEP_SUMMARY
+        echo "| SAST Scan | ${{ needs.sast-scan.result }} | Static application security testing |" >> $GITHUB_STEP_SUMMARY
+        echo "| Secret Scan | ${{ needs.secret-scan.result }} | Secret detection |" >> $GITHUB_STEP_SUMMARY
+        echo "| Infrastructure Scan | ${{ needs.iac-scan.result }} | Infrastructure as Code security |" >> $GITHUB_STEP_SUMMARY
+        echo "| License Compliance | ${{ needs.license-scan.result }} | License compatibility check |" >> $GITHUB_STEP_SUMMARY
+        echo "| Policy Compliance | ${{ needs.compliance-check.result }} | Security policy adherence |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [[ "${{ needs.codeql.result }}" == "success" && 
+              "${{ needs.dependency-scan.result }}" == "success" && 
+              "${{ needs.sast-scan.result }}" == "success" && 
+              "${{ needs.secret-scan.result }}" == "success" && 
+              "${{ needs.iac-scan.result }}" == "success" && 
+              "${{ needs.license-scan.result }}" == "success" && 
+              "${{ needs.compliance-check.result }}" == "success" ]]; then
+          echo "✅ **All security scans passed successfully!**" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Some security scans failed. Please review the results.**" >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: Create security issue if scans fail
+      if: contains(needs.*.result, 'failure')
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const title = `Security Scan Failures - ${new Date().toISOString().split('T')[0]}`;
+          const body = `
+          ## Security Scan Failures Detected
+          
+          **Workflow:** ${{ github.workflow }}
+          **Run ID:** ${{ github.run_id }}
+          **Commit:** ${{ github.sha }}
+          
+          ### Failed Scans:
+          - CodeQL: ${{ needs.codeql.result }}
+          - Dependency Scan: ${{ needs.dependency-scan.result }}
+          - SAST Scan: ${{ needs.sast-scan.result }}
+          - Secret Scan: ${{ needs.secret-scan.result }}
+          - Infrastructure Scan: ${{ needs.iac-scan.result }}
+          - License Compliance: ${{ needs.license-scan.result }}
+          - Policy Compliance: ${{ needs.compliance-check.result }}
+          
+          Please review the workflow results and address any security issues.
+          
+          [View Workflow Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          `;
+          
+          // Only create issue if one doesn't already exist
+          const issues = await github.rest.issues.listForRepo({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            labels: ['security', 'automated'],
+            state: 'open'
+          });
+          
+          const existingIssue = issues.data.find(issue => 
+            issue.title.includes('Security Scan Failures')
+          );
+          
+          if (!existingIssue) {
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['security', 'bug', 'automated']
+            });
+          }

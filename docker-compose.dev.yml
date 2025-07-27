@@ -1,0 +1,168 @@
+version: '3.8'
+
+services:
+  # Development application with hot reload
+  sql-synth-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: sql-synth-app-dev
+    ports:
+      - "8501:8501"
+    environment:
+      - DATABASE_URL=postgresql://sql_synth_user:sql_synth_password@postgres:5432/sql_synth_db
+      - REDIS_URL=redis://redis:6379/0
+      - LOG_LEVEL=DEBUG
+      - DEBUG=true
+      - ENABLE_METRICS=false
+      - STREAMLIT_SERVER_RUN_ON_SAVE=true
+      - STREAMLIT_SERVER_FILE_WATCHER_TYPE=poll
+    volumes:
+      - .:/app
+      - /app/.venv  # Prevent overwriting container's venv
+      - ./data:/app/data
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - sql-synth-network
+    restart: unless-stopped
+    command: >
+      sh -c "
+        pip install -e .[dev] &&
+        streamlit run app.py --server.address 0.0.0.0 --server.port 8501 --server.runOnSave true --server.fileWatcherType poll
+      "
+
+  # PostgreSQL for development
+  postgres:
+    image: postgres:15-alpine
+    container_name: sql-synth-postgres-dev
+    environment:
+      - POSTGRES_DB=sql_synth_dev_db
+      - POSTGRES_USER=sql_synth_user
+      - POSTGRES_PASSWORD=sql_synth_password
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./scripts/init-dev-db.sql:/docker-entrypoint-initdb.d/init-dev-db.sql:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - sql-synth-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sql_synth_user -d sql_synth_dev_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for development
+  redis:
+    image: redis:7-alpine
+    container_name: sql-synth-redis-dev
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_dev_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - sql-synth-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Test database for running tests
+  test-postgres:
+    image: postgres:15-alpine
+    container_name: sql-synth-test-postgres
+    environment:
+      - POSTGRES_DB=test_db
+      - POSTGRES_USER=test_user
+      - POSTGRES_PASSWORD=test_password
+    ports:
+      - "5434:5432"
+    networks:
+      - sql-synth-network
+    tmpfs:
+      - /var/lib/postgresql/data  # Use tmpfs for faster test execution
+    profiles:
+      - testing
+
+  # Jupyter notebook for development and analysis
+  jupyter:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: sql-synth-jupyter
+    ports:
+      - "8888:8888"
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+      - DATABASE_URL=postgresql://sql_synth_user:sql_synth_password@postgres:5432/sql_synth_dev_db
+    volumes:
+      - .:/app
+      - ./notebooks:/app/notebooks
+      - jupyter_data:/home/appuser/.jupyter
+    depends_on:
+      - postgres
+    networks:
+      - sql-synth-network
+    command: >
+      sh -c "
+        pip install jupyterlab ipykernel &&
+        jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --NotebookApp.token='' --NotebookApp.password=''
+      "
+    profiles:
+      - jupyter
+
+  # pgAdmin for database management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: sql-synth-pgadmin
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@admin.com
+      - PGADMIN_DEFAULT_PASSWORD=admin
+      - PGADMIN_CONFIG_SERVER_MODE=False
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - sql-synth-network
+    profiles:
+      - admin
+
+  # MailHog for email testing
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: sql-synth-mailhog
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - sql-synth-network
+    profiles:
+      - testing
+
+volumes:
+  postgres_dev_data:
+    driver: local
+  redis_dev_data:
+    driver: local
+  jupyter_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+networks:
+  sql-synth-network:
+    driver: bridge

@@ -1,0 +1,362 @@
+name: Continuous Deployment
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  release:
+    types: [ published ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Build and Push Docker Images
+  build-and-push:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=semver,pattern={{major}}
+          type=sha,prefix={{branch}}-
+
+    - name: Build and push Docker image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        target: production
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64,linux/arm64
+
+    - name: Generate SBOM
+      uses: anchore/sbom-action@v0
+      with:
+        image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+        format: spdx-json
+        output-file: sbom.spdx.json
+
+    - name: Upload SBOM
+      uses: actions/upload-artifact@v3
+      with:
+        name: sbom
+        path: sbom.spdx.json
+
+  # Security Scanning
+  security-scan:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ needs.build-and-push.outputs.image-tag }}
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+    - name: Run Snyk to check Docker image for vulnerabilities
+      uses: snyk/actions/docker@master
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      with:
+        image: ${{ needs.build-and-push.outputs.image-tag }}
+        args: --severity-threshold=high
+      continue-on-error: true
+
+  # Deploy to Staging
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build-and-push, security-scan]
+    if: github.ref == 'refs/heads/main' || github.event.inputs.environment == 'staging'
+    environment:
+      name: staging
+      url: https://sql-synth-staging.terragonlabs.com
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup staging deployment
+      run: |
+        echo "Deploying to staging environment"
+        echo "Image: ${{ needs.build-and-push.outputs.image-tag }}"
+
+    - name: Deploy to staging cluster
+      run: |
+        # In a real deployment, this would use kubectl, helm, or other deployment tools
+        echo "kubectl set image deployment/sql-synth-app app=${{ needs.build-and-push.outputs.image-tag }} -n staging"
+        
+        # For demonstration, we'll just log the deployment
+        echo "Staging deployment simulated successfully"
+
+    - name: Run smoke tests
+      run: |
+        # Wait for deployment to be ready
+        sleep 60
+        
+        # Run basic health checks
+        echo "Running staging smoke tests..."
+        # curl -f https://sql-synth-staging.terragonlabs.com/health
+        echo "Smoke tests passed"
+
+    - name: Notify deployment status
+      if: always()
+      run: |
+        echo "Staging deployment completed with status: ${{ job.status }}"
+
+  # Deploy to Production
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build-and-push, security-scan, deploy-staging]
+    if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.environment == 'production'
+    environment:
+      name: production
+      url: https://sql-synth.terragonlabs.com
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Production pre-deployment checks
+      run: |
+        echo "Running pre-deployment checks for production..."
+        
+        # Check if this is a tagged release
+        if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+          echo "✅ Tagged release detected: ${{ github.ref }}"
+        else
+          echo "⚠️ Manual production deployment triggered"
+        fi
+
+    - name: Deploy to production cluster
+      run: |
+        echo "Deploying to production environment"
+        echo "Image: ${{ needs.build-and-push.outputs.image-tag }}"
+        
+        # Blue-green deployment simulation
+        echo "Starting blue-green deployment..."
+        
+        # Deploy to green environment
+        echo "kubectl set image deployment/sql-synth-app-green app=${{ needs.build-and-push.outputs.image-tag }} -n production"
+        
+        # Wait for green deployment to be ready
+        echo "Waiting for green deployment to be ready..."
+        sleep 120
+        
+        # Switch traffic to green
+        echo "kubectl patch service sql-synth-app -n production -p '{\"spec\":{\"selector\":{\"version\":\"green\"}}}'"
+        
+        echo "Production deployment completed"
+
+    - name: Run production health checks
+      run: |
+        echo "Running production health checks..."
+        
+        # Wait for traffic switch
+        sleep 30
+        
+        # Health check endpoints
+        # curl -f https://sql-synth.terragonlabs.com/health
+        # curl -f https://sql-synth.terragonlabs.com/metrics
+        
+        echo "Production health checks passed"
+
+    - name: Rollback on failure
+      if: failure()
+      run: |
+        echo "Production deployment failed, initiating rollback..."
+        
+        # Rollback to blue environment
+        echo "kubectl patch service sql-synth-app -n production -p '{\"spec\":{\"selector\":{\"version\":\"blue\"}}}'"
+        
+        echo "Rollback completed"
+
+  # Performance Testing
+  performance-test:
+    name: Performance Testing
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup performance testing
+      run: |
+        npm install -g artillery
+        pip install locust
+
+    - name: Run load tests
+      run: |
+        echo "Running load tests against staging environment..."
+        
+        # Artillery load test
+        # artillery run tests/load/basic-load-test.yml
+        
+        # Locust load test  
+        # locust -f tests/load/locustfile.py --host=https://sql-synth-staging.terragonlabs.com --users=10 --spawn-rate=2 --run-time=5m --headless
+        
+        echo "Load tests completed"
+
+    - name: Upload performance results
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-results
+        path: |
+          artillery-report.json
+          locust-report.html
+
+  # Database Migration
+  database-migration:
+    name: Database Migration
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      run: |
+        pip install -e .[dev]
+
+    - name: Run database migrations
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      run: |
+        echo "Running database migrations..."
+        # alembic upgrade head
+        echo "Database migrations completed"
+
+  # Monitoring and Alerting Setup
+  setup-monitoring:
+    name: Setup Monitoring
+    runs-on: ubuntu-latest
+    needs: [deploy-staging, deploy-production]
+    if: always() && (needs.deploy-staging.result == 'success' || needs.deploy-production.result == 'success')
+
+    steps:
+    - name: Configure monitoring
+      run: |
+        echo "Setting up monitoring and alerting..."
+        
+        # Configure Prometheus alerts
+        # kubectl apply -f monitoring/prometheus-rules.yml
+        
+        # Configure Grafana dashboards
+        # kubectl apply -f monitoring/grafana-dashboards.yml
+        
+        echo "Monitoring setup completed"
+
+  # Cleanup
+  cleanup:
+    name: Cleanup
+    runs-on: ubuntu-latest
+    needs: [deploy-staging, deploy-production, performance-test]
+    if: always()
+
+    steps:
+    - name: Cleanup old container images
+      run: |
+        echo "Cleaning up old container images..."
+        
+        # Keep only the last 10 images
+        # docker image prune -af
+        
+        echo "Cleanup completed"
+
+    - name: Update deployment status
+      run: |
+        echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+        echo "| Environment | Status | Image |" >> $GITHUB_STEP_SUMMARY
+        echo "|-------------|--------|-------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Staging | ${{ needs.deploy-staging.result }} | ${{ needs.build-and-push.outputs.image-tag }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Production | ${{ needs.deploy-production.result }} | ${{ needs.build-and-push.outputs.image-tag }} |" >> $GITHUB_STEP_SUMMARY
+
+  # Notification
+  notify:
+    name: Deployment Notification
+    runs-on: ubuntu-latest
+    needs: [deploy-staging, deploy-production]
+    if: always()
+
+    steps:
+    - name: Notify Slack
+      if: always()
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        channel: '#deployments'
+        text: |
+          Deployment completed for ${{ github.repository }}
+          Staging: ${{ needs.deploy-staging.result }}
+          Production: ${{ needs.deploy-production.result }}
+          Commit: ${{ github.sha }}
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

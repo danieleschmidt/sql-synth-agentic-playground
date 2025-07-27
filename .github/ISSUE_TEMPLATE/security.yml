@@ -1,0 +1,154 @@
+name: 🔒 Security Vulnerability Report
+description: Report a security vulnerability (please use security@terragonlabs.com for sensitive issues)
+title: "[SECURITY] "
+labels: ["security", "bug"]
+assignees:
+  - security-team
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## ⚠️ Important Security Notice
+        
+        **For sensitive security vulnerabilities, please email [security@terragonlabs.com](mailto:security@terragonlabs.com) instead of using this public form.**
+        
+        This form should only be used for:
+        - Non-sensitive security improvements
+        - Security feature requests
+        - General security discussions
+        
+        See our [Security Policy](https://github.com/danieleschmidt/sql-synth-agentic-playground/blob/main/SECURITY.md) for full details.
+
+  - type: dropdown
+    id: vulnerability-type
+    attributes:
+      label: Vulnerability Type
+      description: What type of security issue is this?
+      options:
+        - SQL Injection
+        - Cross-site Scripting (XSS)
+        - Authentication bypass
+        - Authorization issues
+        - Information disclosure
+        - Denial of Service (DoS)
+        - Dependency vulnerability
+        - Configuration issue
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity Assessment
+      description: How severe do you consider this vulnerability?
+      options:
+        - Low (minimal impact)
+        - Medium (moderate impact)
+        - High (significant impact)
+        - Critical (severe impact)
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Vulnerability Description
+      description: Provide a clear description of the security issue
+      placeholder: |
+        Describe the vulnerability, including:
+        - What the issue is
+        - How it can be exploited
+        - What systems/components are affected
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Provide step-by-step instructions to reproduce the issue
+      placeholder: |
+        1. Go to...
+        2. Enter the following input...
+        3. Observe the behavior...
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Potential Impact
+      description: Describe the potential impact if this vulnerability is exploited
+      placeholder: |
+        What could an attacker achieve by exploiting this vulnerability?
+        - Data access
+        - System compromise
+        - Service disruption
+        - etc.
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment Details
+      description: Provide details about the environment where this was discovered
+      placeholder: |
+        - Operating System:
+        - Python version:
+        - Application version:
+        - Deployment method (Docker, local, etc.):
+        - Browser (if applicable):
+    validations:
+      required: false
+
+  - type: textarea
+    id: poc
+    attributes:
+      label: Proof of Concept
+      description: Provide proof of concept code or examples (if safe to share publicly)
+      placeholder: |
+        Provide any safe examples or proof of concept code.
+        DO NOT include actual exploits or sensitive information.
+    validations:
+      required: false
+
+  - type: textarea
+    id: mitigation
+    attributes:
+      label: Suggested Mitigation
+      description: Do you have suggestions for how to fix this issue?
+      placeholder: |
+        Any suggestions for fixing or mitigating this vulnerability
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Security Checklist
+      description: Please confirm the following
+      options:
+        - label: I have read the [Security Policy](https://github.com/danieleschmidt/sql-synth-agentic-playground/blob/main/SECURITY.md)
+          required: true
+        - label: This is not a sensitive vulnerability that should be reported privately
+          required: true
+        - label: I have not included any sensitive information in this report
+          required: true
+        - label: I understand this issue will be visible to the public
+          required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ## Next Steps
+        
+        After submitting this report:
+        1. Our security team will review the issue
+        2. We may ask for additional information
+        3. We will provide updates on the fix timeline
+        4. You will be credited in our security acknowledgments (if desired)
+        
+        Thank you for helping to improve our security! 🙏

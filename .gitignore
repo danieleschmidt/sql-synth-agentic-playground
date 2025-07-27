@@ -205,3 +205,74 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Project specific
+# Streamlit
+.streamlit/config.toml
+
+# Data directories and databases
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Benchmark datasets (large files)
+spider/
+wikisql/
+benchmark-data/
+
+# Model files (can be large)
+models/
+*.pkl
+*.joblib
+*.model
+
+# Backup and archive files
+backups/
+archives/
+
+# Performance profiling
+*.prof
+*.pstats
+
+# Local configuration
+local_config.py
+local_settings.py
+
+# Application specific
+app_data/
+user_data/
+session_state/
+
+# Monitoring and observability
+metrics/
+traces/
+monitoring_data/
+
+# Security files
+*.pem
+*.key
+*.crt
+*.p12
+secrets.txt
+secrets.json
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files (keeping some)
+.vscode/launch.json
+.vscode/tasks.json
+
+# Docker overrides
+docker-compose.override.yml
+
+# Cache directories
+.cache/
+.black_cache/
