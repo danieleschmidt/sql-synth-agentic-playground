@@ -1,0 +1,319 @@
+# Performance Configuration for SQL Synthesis Agentic Playground
+# This file defines performance thresholds, optimization settings, and monitoring parameters
+
+# Performance Thresholds
+thresholds:
+  # Response time thresholds (seconds)
+  response_time:
+    excellent: 0.5
+    good: 1.0
+    acceptable: 2.0
+    critical: 5.0
+  
+  # Memory usage thresholds (MB)
+  memory:
+    low: 100
+    medium: 250
+    high: 500
+    critical: 1000
+  
+  # CPU usage thresholds (percentage)
+  cpu:
+    low: 20
+    medium: 50
+    high: 80
+    critical: 95
+  
+  # Database query thresholds
+  database:
+    query_time_max: 3.0
+    connection_pool_size: 20
+    query_timeout: 30
+    slow_query_threshold: 1.0
+  
+  # Error rate thresholds (percentage)
+  error_rate:
+    acceptable: 1.0
+    warning: 5.0
+    critical: 10.0
+
+# Caching Configuration
+caching:
+  # Query result caching
+  query_cache:
+    enabled: true
+    ttl: 3600  # 1 hour in seconds
+    max_size: 1000  # Maximum number of cached queries
+    eviction_policy: "lru"  # least recently used
+  
+  # LLM response caching
+  llm_cache:
+    enabled: true
+    ttl: 7200  # 2 hours
+    max_size: 500
+    cache_similar_queries: true
+    similarity_threshold: 0.85
+  
+  # Database connection pooling
+  connection_pool:
+    enabled: true
+    pool_size: 10
+    max_overflow: 20
+    pool_timeout: 30
+    pool_recycle: 3600
+
+# Performance Optimization Settings
+optimization:
+  # Async processing
+  async_processing:
+    enabled: true
+    max_concurrent_requests: 50
+    queue_size: 200
+    worker_threads: 4
+  
+  # Query optimization
+  query_optimization:
+    enable_query_planning: true
+    optimize_joins: true
+    use_indexes: true
+    parallel_execution: true
+  
+  # Memory management
+  memory_management:
+    garbage_collection_threshold: 0.8
+    memory_limit_per_request: 256  # MB
+    enable_memory_profiling: false
+    cleanup_interval: 300  # seconds
+  
+  # Streaming responses
+  streaming:
+    enabled: true
+    chunk_size: 1024
+    buffer_size: 8192
+    timeout: 30
+
+# Monitoring Configuration
+monitoring:
+  # Metrics collection
+  metrics:
+    enabled: true
+    collection_interval: 60  # seconds
+    retention_period: 2592000  # 30 days
+    export_format: "prometheus"
+  
+  # Performance alerts
+  alerts:
+    enabled: true
+    alert_channels: ["email", "webhook"]
+    escalation_levels: 3
+    cooldown_period: 300  # seconds
+  
+  # Profiling settings
+  profiling:
+    enabled: false  # Enable only for debugging
+    sample_rate: 0.01  # 1% of requests
+    profile_memory: true
+    profile_cpu: true
+    profile_duration: 300  # seconds
+
+# Load Testing Configuration
+load_testing:
+  # Test scenarios
+  scenarios:
+    light_load:
+      concurrent_users: 10
+      ramp_up_time: 30
+      test_duration: 300
+      requests_per_second: 5
+    
+    medium_load:
+      concurrent_users: 50
+      ramp_up_time: 60
+      test_duration: 600
+      requests_per_second: 25
+    
+    heavy_load:
+      concurrent_users: 100
+      ramp_up_time: 120
+      test_duration: 900
+      requests_per_second: 50
+    
+    stress_test:
+      concurrent_users: 200
+      ramp_up_time: 180
+      test_duration: 1200
+      requests_per_second: 100
+  
+  # Test queries for load testing
+  test_queries:
+    - "Show me all active users"
+    - "What are the top 10 products by sales?"
+    - "Find orders from last month"
+    - "List customers with high value orders"
+    - "Show revenue trends by quarter"
+    - "Find products with low inventory"
+    - "Show user activity by region"
+    - "List recent transactions"
+
+# Performance Benchmarks
+benchmarks:
+  # SQL generation benchmarks
+  sql_generation:
+    simple_queries:
+      target_time: 0.3
+      acceptable_time: 0.5
+    
+    complex_queries:
+      target_time: 1.0
+      acceptable_time: 2.0
+    
+    join_queries:
+      target_time: 0.8
+      acceptable_time: 1.5
+  
+  # Database benchmarks
+  database_operations:
+    connection_time:
+      target: 0.1
+      acceptable: 0.3
+    
+    query_execution:
+      simple_select:
+        target: 0.05
+        acceptable: 0.1
+      
+      complex_join:
+        target: 0.5
+        acceptable: 1.0
+      
+      aggregation:
+        target: 0.3
+        acceptable: 0.8
+  
+  # System benchmarks
+  system_performance:
+    memory_usage:
+      baseline: 100  # MB
+      maximum: 500   # MB
+    
+    cpu_usage:
+      baseline: 10   # %
+      maximum: 70    # %
+    
+    response_times:
+      p50: 0.5   # seconds
+      p95: 1.5   # seconds
+      p99: 3.0   # seconds
+
+# Auto-scaling Configuration
+autoscaling:
+  enabled: false  # Enable for production
+  
+  # Scaling triggers
+  triggers:
+    cpu_threshold: 70      # Scale up when CPU > 70%
+    memory_threshold: 80   # Scale up when memory > 80%
+    response_time: 2.0     # Scale up when response time > 2s
+    queue_depth: 100       # Scale up when queue > 100 requests
+  
+  # Scaling parameters
+  scaling:
+    min_instances: 1
+    max_instances: 10
+    scale_up_cooldown: 300    # seconds
+    scale_down_cooldown: 600  # seconds
+    target_cpu_utilization: 50  # %
+
+# Development Performance Settings
+development:
+  # Debug performance features
+  debug:
+    enable_query_logging: true
+    log_slow_queries: true
+    profile_requests: false
+    detailed_error_messages: true
+  
+  # Local optimization
+  local_optimization:
+    reduce_cache_ttl: true
+    enable_hot_reload: true
+    skip_heavy_operations: false
+    mock_external_services: false
+
+# Production Performance Settings
+production:
+  # Production optimizations
+  optimizations:
+    enable_compression: true
+    minimize_logging: true
+    optimize_database_connections: true
+    enable_cdn: true
+  
+  # Security vs Performance trade-offs
+  security:
+    enable_rate_limiting: true
+    request_validation: "strict"
+    audit_logging: true
+    encryption_level: "high"
+
+# Performance Testing Integration
+testing:
+  # Continuous performance testing
+  continuous_testing:
+    enabled: true
+    test_frequency: "daily"
+    regression_threshold: 20  # % degradation
+    baseline_update_frequency: "weekly"
+  
+  # Performance gates
+  gates:
+    build_performance_test: true
+    deployment_smoke_test: true
+    production_health_check: true
+  
+  # Test data configuration
+  test_data:
+    dataset_size: "medium"  # small, medium, large
+    synthetic_data: true
+    data_refresh_interval: "monthly"
+
+# Reporting Configuration
+reporting:
+  # Performance reports
+  reports:
+    daily_summary: true
+    weekly_detailed: true
+    monthly_trends: true
+    quarterly_review: true
+  
+  # Report recipients
+  recipients:
+    - "dev-team@company.com"
+    - "performance-team@company.com"
+  
+  # Report formats
+  formats:
+    - "html"
+    - "pdf"
+    - "json"
+
+# Integration Settings
+integrations:
+  # APM tools
+  apm:
+    enabled: false
+    provider: "datadog"  # datadog, newrelic, dynatrace
+    sample_rate: 1.0
+  
+  # Logging
+  logging:
+    performance_logs: true
+    structured_logging: true
+    log_level: "INFO"
+    log_rotation: true
+  
+  # Metrics export
+  metrics_export:
+    prometheus: true
+    grafana_dashboard: true
+    custom_dashboards: true
