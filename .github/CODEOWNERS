@@ -1,0 +1,39 @@
+# CODEOWNERS
+# This file defines who gets requested for review when someone opens a pull request.
+# Order is important; the last matching pattern takes the most precedence.
+
+# Global fallback - all files
+* @danieleschmidt
+
+# Core application code
+/src/ @danieleschmidt
+/app.py @danieleschmidt
+
+# Configuration and infrastructure
+/.github/ @danieleschmidt
+/docker-compose*.yml @danieleschmidt
+/Dockerfile @danieleschmidt
+/pyproject.toml @danieleschmidt
+/.pre-commit-config.yaml @danieleschmidt
+
+# Security-sensitive files require additional review
+/SECURITY.md @danieleschmidt
+/.github/dependabot.yml @danieleschmidt
+/scripts/security_scan.py @danieleschmidt
+
+# Documentation requires core team review
+/docs/ @danieleschmidt
+/README.md @danieleschmidt
+/CONTRIBUTING.md @danieleschmidt
+
+# Tests
+/tests/ @danieleschmidt
+
+# Database and configuration files
+/config/ @danieleschmidt
+/src/sql_synth/database.py @danieleschmidt
+/src/sql_synth/security.py @danieleschmidt
+
+# CI/CD and automation
+/.github/workflows/ @danieleschmidt
+/scripts/ @danieleschmidt

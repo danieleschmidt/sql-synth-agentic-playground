@@ -1,0 +1,401 @@
+# Kubernetes deployment manifests for SQL Synthesis Agentic Playground
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sql-synth
+  labels:
+    name: sql-synth
+    app.kubernetes.io/name: sql-synthesis-agentic-playground
+    app.kubernetes.io/version: "1.0.0"
+---
+# ConfigMap for application configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sql-synth-config
+  namespace: sql-synth
+  labels:
+    app.kubernetes.io/name: sql-synth
+    app.kubernetes.io/component: config
+data:
+  # Application settings
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"
+  DEBUG: "false"
+  
+  # Database configuration (non-sensitive)
+  DATABASE_HOST: "postgres-service.sql-synth.svc.cluster.local"
+  DATABASE_PORT: "5432"
+  DATABASE_NAME: "sql_synth"
+  
+  # Redis configuration
+  REDIS_HOST: "redis-service.sql-synth.svc.cluster.local"
+  REDIS_PORT: "6379"
+  
+  # Performance settings
+  MAX_WORKERS: "4"
+  QUERY_TIMEOUT: "30"
+  CACHE_TTL: "3600"
+  
+  # Security settings
+  ALLOWED_HOSTS: "*"
+  CORS_ORIGINS: "*"
+  
+  # Monitoring
+  METRICS_ENABLED: "true"
+  METRICS_PORT: "9090"
+  HEALTH_CHECK_PATH: "/health"
+---
+# Secret for sensitive configuration
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sql-synth-secrets
+  namespace: sql-synth
+  labels:
+    app.kubernetes.io/name: sql-synth
+    app.kubernetes.io/component: secrets
+type: Opaque
+data:
+  # These should be base64 encoded in actual deployment
+  DATABASE_PASSWORD: "cG9zdGdyZXM="  # 'postgres' - replace with actual password
+  DATABASE_URL: "cG9zdGdyZXNxbDovL3Bvc3RncmVzOnBvc3RncmVzQHBvc3RncmVzLXNlcnZpY2U6NTQzMi9zcWxfc3ludGg="
+  SECRET_KEY: "c3VwZXItc2VjcmV0LWtleS1jaGFuZ2UtbWU="  # Change this!
+  API_KEY: "YXBpLWtleS1jaGFuZ2UtbWU="  # Change this!
+---
+# Deployment for the main application
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sql-synth-app
+  namespace: sql-synth
+  labels:
+    app.kubernetes.io/name: sql-synth
+    app.kubernetes.io/component: app
+    app.kubernetes.io/version: "1.0.0"
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sql-synth
+      app.kubernetes.io/component: app
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: sql-synth
+        app.kubernetes.io/component: app
+        app.kubernetes.io/version: "1.0.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: sql-synth-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+      - name: sql-synth
+        image: ghcr.io/danieleschmidt/sql-synth-agentic-playground:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8501
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        env:
+        - name: PORT
+          value: "8501"
+        envFrom:
+        - configMapRef:
+            name: sql-synth-config
+        - secretRef:
+            name: sql-synth-secrets
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+          requests:
+            cpu: 250m
+            memory: 256Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: app-cache
+          mountPath: /app/.cache
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: app-cache
+        emptyDir: {}
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      tolerations:
+      - key: "node.kubernetes.io/not-ready"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 300
+      - key: "node.kubernetes.io/unreachable"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 300
+---
+# Service for the application
+apiVersion: v1
+kind: Service
+metadata:
+  name: sql-synth-service
+  namespace: sql-synth
+  labels:
+    app.kubernetes.io/name: sql-synth
+    app.kubernetes.io/component: app
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+spec:
+  type: LoadBalancer
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: metrics
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: sql-synth
+    app.kubernetes.io/component: app
+---
+# Horizontal Pod Autoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: sql-synth-hpa
+  namespace: sql-synth
+  labels:
+    app.kubernetes.io/name: sql-synth
+    app.kubernetes.io/component: autoscaler
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: sql-synth-app
+  minReplicas: 2
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+      - type: Pods
+        value: 4
+        periodSeconds: 15
+      selectPolicy: Max
+---
+# Pod Disruption Budget
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: sql-synth-pdb
+  namespace: sql-synth
+  labels:
+    app.kubernetes.io/name: sql-synth
+    app.kubernetes.io/component: app
+spec:
+  minAvailable: 50%
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sql-synth
+      app.kubernetes.io/component: app
+---
+# Service Account
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sql-synth-service-account
+  namespace: sql-synth
+  labels:
+    app.kubernetes.io/name: sql-synth
+    app.kubernetes.io/component: rbac
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/sql-synth-service-role
+---
+# Network Policy for security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sql-synth-network-policy
+  namespace: sql-synth
+  labels:
+    app.kubernetes.io/name: sql-synth
+    app.kubernetes.io/component: security
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: sql-synth
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: istio-system
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    - podSelector: {}
+    ports:
+    - protocol: TCP
+      port: 8501
+    - protocol: TCP
+      port: 9090
+  egress:
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: postgres
+    ports:
+    - protocol: TCP
+      port: 5432
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+---
+# Pod Security Policy (if enabled)
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: sql-synth-psp
+  labels:
+    app.kubernetes.io/name: sql-synth
+    app.kubernetes.io/component: security
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  runAsGroup:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1000
+        max: 65535
+  seLinux:
+    rule: 'RunAsAny'
+  supplementalGroups:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1000
+        max: 65535
+  fsGroup:
+    rule: 'RunAsAny'
+  readOnlyRootFilesystem: true
+---
+# Ingress for external access (with HTTPS)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sql-synth-ingress
+  namespace: sql-synth
+  labels:
+    app.kubernetes.io/name: sql-synth
+    app.kubernetes.io/component: ingress
+  annotations:
+    kubernetes.io/ingress.class: "alb"
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:region:account:certificate/cert-id"
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/healthcheck-path: "/health"
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
+spec:
+  rules:
+  - host: sql-synth.example.com  # Replace with actual domain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: sql-synth-service
+            port:
+              number: 80
+  tls:
+  - hosts:
+    - sql-synth.example.com  # Replace with actual domain
+    secretName: sql-synth-tls
