@@ -266,9 +266,9 @@ secrets.json
 ehthumbs.db
 Thumbs.db
 
-# IDE files (keeping some)
-.vscode/launch.json
-.vscode/tasks.json
+# IDE files (allowing advanced development configs)
+# .vscode/launch.json  # Uncomment to ignore
+# .vscode/tasks.json   # Uncomment to ignore
 
 # Docker overrides
 docker-compose.override.yml

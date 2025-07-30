@@ -1,0 +1,111 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug Streamlit App",
+            "type": "python",
+            "request": "launch",
+            "module": "streamlit",
+            "args": [
+                "run",
+                "app.py",
+                "--server.port",
+                "8501",
+                "--server.headless",
+                "true"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src",
+                "STREAMLIT_SERVER_HEADLESS": "true"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "Debug SQL Synthesis Agent",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/sql_synth/database.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": [
+                "--debug",
+                "--query",
+                "Show me all users who made purchases last month"
+            ]
+        },
+        {
+            "name": "Debug Tests",
+            "type": "python",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "-v",
+                "-s",
+                "${workspaceFolder}/tests/"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            }
+        },
+        {
+            "name": "Debug Specific Test",
+            "type": "python",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "-v",
+                "-s",
+                "${file}"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            }
+        },
+        {
+            "name": "Performance Profiling",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/performance_profiler.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "--profile",
+                "--output",
+                "performance_profile.json"
+            ]
+        },
+        {
+            "name": "Security Scan Debug",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/security_scan.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "--verbose",
+                "--report",
+                "security_report.json"
+            ]
+        },
+        {
+            "name": "Dev Automation",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/dev_automation.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "all"
+            ]
+        }
+    ]
+}

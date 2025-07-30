@@ -1,0 +1,151 @@
+# MLOps Configuration for SQL Synthesis Agentic Playground
+# This configuration supports AI/ML model lifecycle management
+
+metadata:
+  version: "1.0.0"
+  created: "2025-01-30"
+  description: "MLOps configuration for SQL synthesis agent"
+
+# Model Management
+model_registry:
+  enabled: true
+  backend: "local"  # Can be extended to MLflow, Weights & Biases, etc.
+  models:
+    sql_synthesizer:
+      type: "language_model"
+      framework: "langchain"
+      metrics: ["accuracy", "bleu_score", "execution_success_rate"]
+      validation_datasets: ["spider", "wikisql"]
+      
+# Experiment Tracking
+experiment_tracking:
+  enabled: true
+  framework: "mlflow"  # Alternative: wandb, tensorboard
+  tracking_uri: "file://./mlruns"
+  experiments:
+    - name: "sql_generation_accuracy"
+      parameters: ["temperature", "max_tokens", "model_name"]
+      metrics: ["spider_accuracy", "wikisql_accuracy", "response_time"]
+    - name: "prompt_optimization"
+      parameters: ["prompt_template", "few_shot_examples"]
+      metrics: ["success_rate", "query_complexity_score"]
+
+# Data Management
+data_management:
+  versioning:
+    enabled: true
+    backend: "dvc"  # Data Version Control
+    storage: "local"
+  datasets:
+    spider:
+      version: "1.0"
+      source: "https://yale-lily.github.io/spider"
+      validation_split: 0.2
+      preprocessing: "standardize_schemas"
+    wikisql:
+      version: "1.0" 
+      source: "https://github.com/salesforce/WikiSQL"
+      validation_split: 0.2
+      preprocessing: "normalize_queries"
+  
+# Model Validation
+validation:
+  automated_testing:
+    enabled: true
+    on_model_change: true
+    benchmarks:
+      - name: "spider_benchmark"
+        threshold: 0.75  # Minimum accuracy
+        timeout: 300     # seconds
+      - name: "wikisql_benchmark"
+        threshold: 0.80
+        timeout: 180
+  performance_testing:
+    response_time_threshold: 2.0  # seconds
+    throughput_threshold: 10      # queries per second
+    memory_threshold: 1024        # MB
+
+# Monitoring
+monitoring:
+  model_drift:
+    enabled: true
+    method: "statistical"
+    alert_threshold: 0.1  # PSI threshold
+    monitoring_window: "7d"
+  data_drift:
+    enabled: true
+    features: ["query_complexity", "schema_size", "join_count"]
+    alert_threshold: 0.15
+  performance:
+    response_time: true
+    accuracy_degradation: true
+    error_rate: true
+    alert_channels: ["email", "slack"]
+
+# A/B Testing
+ab_testing:
+  enabled: true
+  framework: "custom"  # Can be extended to Optimizely, etc.
+  tests:
+    - name: "prompt_variants"
+      variants: ["standard", "cot", "few_shot"]
+      metric: "accuracy"
+      sample_size: 1000
+      confidence_level: 0.95
+
+# Deployment
+deployment:
+  strategy: "blue_green"
+  canary:
+    enabled: true
+    traffic_percentage: 10
+    success_criteria:
+      accuracy_threshold: 0.75
+      error_rate_threshold: 0.05
+      duration: "24h"
+  rollback:
+    automatic: true
+    triggers: ["accuracy_drop", "error_spike", "timeout_increase"]
+    
+# Security
+security:
+  model_governance:
+    bias_detection: true
+    fairness_metrics: ["demographic_parity", "equalized_odds"]
+    explainability: true
+  data_privacy:
+    pii_detection: true
+    anonymization: true
+    encryption_at_rest: true
+    
+# Resource Management  
+resources:
+  compute:
+    cpu_limit: "2000m"
+    memory_limit: "4Gi"
+    gpu_enabled: false
+  scaling:
+    min_replicas: 1
+    max_replicas: 5
+    target_cpu_utilization: 70
+    
+# Integration
+integrations:
+  langchain:
+    version: ">=0.1.0"
+    callbacks: ["wandb", "mlflow"]
+  streamlit:
+    enable_ml_metrics: true
+    display_confidence: true
+  databases:
+    connection_pooling: true
+    query_caching: true
+    
+# Development
+development:
+  notebook_integration: true
+  jupyter_extensions: ["mlflow", "wandb"]
+  debugging:
+    trace_enabled: true
+    log_predictions: true
+    log_errors: true

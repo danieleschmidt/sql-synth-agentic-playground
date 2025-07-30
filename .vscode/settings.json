@@ -111,6 +111,35 @@
   
   // Extensions
   "python.analysis.autoImportCompletions": true,
-  "python.analysis.typeCheckingMode": "basic",
-  "extensions.ignoreRecommendations": false
+  "python.analysis.typeCheckingMode": "strict",
+  "python.analysis.diagnosticMode": "workspace",
+  "python.analysis.autoSearchPaths": true,
+  "python.analysis.stubPath": "./typings",
+  "extensions.ignoreRecommendations": false,
+  
+  // Performance optimizations
+  "python.analysis.indexing": true,
+  "python.analysis.packageIndexDepths": [
+    {
+      "name": "streamlit",
+      "depth": 2
+    },
+    {
+      "name": "langchain",
+      "depth": 2
+    }
+  ],
+  
+  // Security
+  "security.workspace.trust.enabled": true,
+  "security.workspace.trust.startupPrompt": "always",
+  
+  // AI/ML specific
+  "jupyter.askForKernelRestart": false,
+  "jupyter.widgetScriptSources": ["jsdelivr.com", "unpkg.com"],
+  
+  // Advanced debugging
+  "debug.allowBreakpointsEverywhere": true,
+  "debug.inlineValues": "auto",
+  "debug.showInStatusBar": "always"
 }
