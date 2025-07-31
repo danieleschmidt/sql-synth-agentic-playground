@@ -1,0 +1,62 @@
+# Gitleaks configuration for enhanced security scanning
+title = "SQL Synth Agentic Playground Security Configuration"
+
+[extend]
+# Extend base configuration with custom rules
+useDefault = true
+
+[[rules]]
+id = "sql-connection-string"
+description = "SQL connection strings with credentials"
+regex = '''(mysql|postgresql|postgres|mssql|oracle)://[^:]+:[^@]+@'''
+tags = ["database", "credentials"]
+
+[[rules]]
+id = "api-key-header"
+description = "API keys in HTTP headers"
+regex = '''(?i)(x-api-key|api-key|authorization):\s*[a-z0-9]{20,}'''
+tags = ["api", "key"]
+
+[[rules]]
+id = "jwt-token"
+description = "JWT tokens"
+regex = '''eyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*'''
+tags = ["jwt", "token"]
+
+[[rules]]
+id = "database-password"
+description = "Database password patterns"
+regex = '''(?i)(db_pass|database_password|db_password)\s*=\s*['""][^'""]+['""]'''
+tags = ["database", "password"]
+
+[[rules]]
+id = "langchain-api-key"
+description = "LangChain API keys"
+regex = '''(?i)(langchain_api_key|openai_api_key|anthropic_api_key)\s*=\s*['""][^'""]+['""]'''
+tags = ["langchain", "api", "key"]
+
+[[rules]]
+id = "streamlit-secrets"
+description = "Streamlit secrets"
+regex = '''st\.secrets\[['""][^'""]+['""]]\s*=\s*['""][^'""]+['""]'''
+tags = ["streamlit", "secrets"]
+
+[allowlist]
+description = "Allowlist for false positives"
+paths = [
+    ".env.example",
+    "tests/fixtures/",
+    "docs/",
+    "*.md",
+    "scripts/test_data.py"
+]
+
+regexes = [
+    '''example\.com''',
+    '''localhost''',
+    '''127\.0\.0\.1''',
+    '''fake_key_for_testing''',
+    '''dummy_token''',
+    '''test_password_123''',
+    '''placeholder_api_key'''
+]
