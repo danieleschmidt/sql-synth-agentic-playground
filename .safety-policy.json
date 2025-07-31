@@ -1,0 +1,18 @@
+{
+  "security": {
+    "ignore-vulnerabilities": [],
+    "ignore-unpinned-requirements": false,
+    "continue-on-vulnerability-error": false
+  },
+  "report": {
+    "only-report": false,
+    "full-report": true,
+    "output": "safety-report.json"
+  },
+  "alert": {
+    "ignore-severity-below": "low"
+  },
+  "audit": {
+    "ignore-audit": []
+  }
+}
