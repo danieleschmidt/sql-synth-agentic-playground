@@ -1,0 +1,142 @@
+# Terragon Autonomous SDLC Configuration
+# Optimized for ADVANCED maturity repositories (75%+ SDLC maturity)
+
+repository_info:
+  name: "sql-synth-agentic-playground"
+  maturity_level: "advanced"
+  maturity_score: 78
+  primary_language: "python"
+  framework: "streamlit+langchain"
+  architecture_type: "ml_ai_application"
+
+scoring:
+  weights:
+    advanced:
+      wsjf: 0.5      # Weighted Shortest Job First
+      ice: 0.1       # Impact, Confidence, Ease
+      technicalDebt: 0.3  # Technical debt focus for advanced repos
+      security: 0.1   # Security improvements
+  
+  thresholds:
+    minScore: 15        # Higher threshold for advanced repos
+    maxRisk: 0.7        # Lower risk tolerance
+    securityBoost: 2.0  # 2x boost for security items
+    complianceBoost: 1.8 # 1.8x boost for compliance
+    performanceBoost: 1.5 # 1.5x boost for performance
+    modernizationBoost: 1.6 # 1.6x boost for modernization
+
+discovery:
+  sources:
+    - gitHistory        # Git commit analysis
+    - staticAnalysis    # Code quality analysis
+    - issueTrackers     # GitHub issues
+    - vulnerabilityDatabases # Security databases
+    - performanceMonitoring  # Performance metrics
+    - dependencyAnalysis # Dependency updates
+    - architecturalDebt # Architecture modernization
+  
+  tools:
+    staticAnalysis:
+      - ruff            # Python linter (already configured)
+      - mypy            # Type checking (already configured)
+      - bandit          # Security analysis (already configured)
+      - pylint          # Code quality (already configured)
+    security:
+      - advanced_security_scan.py  # Custom security scanner
+      - compliance_audit.py        # Compliance auditing
+      - trivy           # Container security
+    performance:
+      - advanced_performance_analyzer.py  # Custom performance tool
+      - performance_profiler.py          # Performance profiling
+    dependencies:
+      - pip-audit       # Python dependency security
+      - safety          # Known security vulnerabilities
+    architecture:
+      - technical_debt_analyzer.py  # Technical debt analysis
+
+execution:
+  maxConcurrentTasks: 1
+  testRequirements:
+    minCoverage: 80     # Match pytest.ini requirement
+    performanceRegression: 3  # Max 3% performance regression
+    securityTests: true # Security tests required
+  rollbackTriggers:
+    - testFailure
+    - buildFailure
+    - securityViolation
+    - coverageReduction
+    - performanceRegression
+  
+  integrations:
+    ci_cd: 
+      enabled: false    # GitHub Actions workflows need manual setup
+      provider: "github_actions"
+    monitoring:
+      enabled: true
+      config_path: "config/"
+    container:
+      enabled: true
+      dockerfile: "Dockerfile"
+      compose: "docker-compose.yml"
+
+value_tracking:
+  metrics:
+    - technicalDebtReduction
+    - securityPostureImprovement
+    - performanceOptimization
+    - codeQualityEnhancement
+    - dependencyModernization
+    - architecturalImprovement
+    - testCoverageIncrease
+    - documentationCompletion
+  
+  reporting:
+    format: "markdown"
+    frequency: "daily"
+    include_trends: true
+    include_roi: true
+
+continuous_learning:
+  enabled: true
+  feedback_sources:
+    - execution_outcomes
+    - performance_metrics
+    - security_incidents
+    - user_feedback
+  
+  adaptation_triggers:
+    - accuracy_below_threshold: 0.75
+    - effort_estimation_error: 0.3
+    - value_prediction_error: 0.4
+  
+  model_updates:
+    - scoring_weights
+    - effort_estimation
+    - risk_assessment
+    - priority_calculation
+
+autonomous_schedule:
+  immediate_execution:
+    - security_vulnerabilities
+    - critical_performance_issues
+    - compliance_violations
+  
+  hourly:
+    - security_scans
+    - dependency_updates
+    - performance_monitoring
+  
+  daily:
+    - comprehensive_static_analysis
+    - technical_debt_assessment
+    - value_discovery_cycle
+  
+  weekly:
+    - architectural_analysis
+    - modernization_opportunities
+    - strategic_value_alignment
+  
+  monthly:
+    - scoring_model_recalibration
+    - process_optimization
+    - ROI_assessment
