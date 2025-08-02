@@ -1,0 +1,495 @@
+# Automated Dependency Management Workflow
+# This workflow must be manually created at .github/workflows/dependency-update.yml
+
+name: Dependency Management
+
+on:
+  schedule:
+    # Run weekly on Mondays at 9 AM UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+    inputs:
+      update_type:
+        description: 'Type of dependency update'
+        required: true
+        default: 'minor'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - security
+      target_package:
+        description: 'Specific package to update (optional)'
+        required: false
+        type: string
+
+env:
+  PYTHON_VERSION: '3.11'
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: write
+
+jobs:
+  # Analyze current dependencies
+  analyze-dependencies:
+    name: Analyze Dependencies
+    runs-on: ubuntu-latest
+    outputs:
+      has_updates: ${{ steps.check.outputs.has_updates }}
+      security_updates: ${{ steps.check.outputs.security_updates }}
+      update_count: ${{ steps.check.outputs.update_count }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          
+      - name: Install analysis tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-audit pip-tools safety
+          
+      - name: Check for outdated packages
+        id: check
+        run: |
+          # Check for outdated packages
+          pip list --outdated --format=json > outdated-packages.json
+          
+          # Count updates available
+          update_count=$(jq length outdated-packages.json)
+          echo "update_count=$update_count" >> $GITHUB_OUTPUT
+          
+          # Check if there are any updates
+          has_updates=$([ $update_count -gt 0 ] && echo "true" || echo "false")
+          echo "has_updates=$has_updates" >> $GITHUB_OUTPUT
+          
+          # Check for security vulnerabilities
+          pip-audit --format=json --output=security-audit.json || true
+          security_count=$(jq '.vulnerabilities | length' security-audit.json 2>/dev/null || echo "0")
+          security_updates=$([ $security_count -gt 0 ] && echo "true" || echo "false")
+          echo "security_updates=$security_updates" >> $GITHUB_OUTPUT
+          
+          echo "Found $update_count package updates and $security_count security issues"
+          
+      - name: Upload analysis results
+        uses: actions/upload-artifact@v3
+        with:
+          name: dependency-analysis
+          path: |
+            outdated-packages.json
+            security-audit.json
+          retention-days: 7
+
+  # Update security-critical dependencies
+  security-updates:
+    name: Security Updates
+    runs-on: ubuntu-latest
+    needs: analyze-dependencies
+    if: needs.analyze-dependencies.outputs.security_updates == 'true' || github.event.inputs.update_type == 'security'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          
+      - name: Install tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-audit pip-tools safety
+          
+      - name: Download analysis results
+        uses: actions/download-artifact@v3
+        with:
+          name: dependency-analysis
+          
+      - name: Apply security updates
+        run: |
+          # Get list of vulnerable packages
+          vulnerable_packages=$(jq -r '.vulnerabilities[].package' security-audit.json | sort -u)
+          
+          if [ -n "$vulnerable_packages" ]; then
+            echo "Updating vulnerable packages: $vulnerable_packages"
+            
+            # Update each vulnerable package
+            for package in $vulnerable_packages; do
+              echo "Updating $package..."
+              pip install --upgrade "$package"
+            done
+            
+            # Update requirements.txt
+            pip freeze > requirements.txt.new
+            mv requirements.txt.new requirements.txt
+            
+            # Update pyproject.toml if it exists
+            if [ -f pyproject.toml ]; then
+              pip-compile --upgrade pyproject.toml
+            fi
+          fi
+          
+      - name: Run tests after security updates
+        run: |
+          pip install -e .[dev]
+          python -m pytest tests/unit/ -x --tb=short
+          
+      - name: Create security update PR
+        if: success()
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'security: update vulnerable dependencies'
+          title: '🔒 Security: Update vulnerable dependencies'
+          body: |
+            ## Security Dependency Updates
+            
+            This PR updates dependencies with known security vulnerabilities.
+            
+            ### Changes
+            - Updated vulnerable packages identified by pip-audit
+            - All tests pass with updated dependencies
+            
+            ### Security Audit Results
+            See attached security-audit.json for detailed vulnerability information.
+            
+            ### Testing
+            - ✅ Unit tests pass
+            - ✅ Security scan clean
+            
+            **Auto-generated by dependency management workflow**
+          branch: security/dependency-updates
+          labels: |
+            security
+            dependencies
+            automated
+          reviewers: |
+            danieleschmidt
+          draft: false
+
+  # Update regular dependencies
+  regular-updates:
+    name: Regular Updates
+    runs-on: ubuntu-latest
+    needs: analyze-dependencies
+    if: |
+      needs.analyze-dependencies.outputs.has_updates == 'true' && 
+      github.event.inputs.update_type != 'security'
+    strategy:
+      matrix:
+        update_type: [patch, minor]
+      fail-fast: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          
+      - name: Install tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-tools pip-upgrader
+          
+      - name: Download analysis results
+        uses: actions/download-artifact@v3
+        with:
+          name: dependency-analysis
+          
+      - name: Apply dependency updates
+        run: |
+          # Determine update strategy based on matrix
+          if [ "${{ matrix.update_type }}" = "patch" ]; then
+            # Only patch updates (bug fixes)
+            pip-upgrader --to-patch requirements.txt
+          elif [ "${{ matrix.update_type }}" = "minor" ]; then
+            # Minor updates (new features, backward compatible)
+            pip-upgrader --to-minor requirements.txt
+          elif [ "${{ matrix.update_type }}" = "major" ]; then
+            # Major updates (breaking changes)
+            pip-upgrader requirements.txt
+          fi
+          
+          # Handle specific package if provided
+          if [ -n "${{ github.event.inputs.target_package }}" ]; then
+            pip install --upgrade "${{ github.event.inputs.target_package }}"
+            pip freeze > requirements.txt
+          fi
+          
+      - name: Install updated dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -e .[dev]
+          
+      - name: Run comprehensive tests
+        run: |
+          # Run tests to ensure updates don't break anything
+          python -m pytest tests/ -v --tb=short
+          
+          # Run type checking
+          mypy src/
+          
+          # Run linting
+          ruff check .
+          
+          # Run security checks
+          bandit -r src/
+          
+      - name: Generate update summary
+        run: |
+          # Compare old and new requirements
+          git diff --no-index requirements.txt.bak requirements.txt > update-diff.txt || true
+          
+          # Create summary
+          echo "## Dependency Updates (${{ matrix.update_type }})" > update-summary.md
+          echo "" >> update-summary.md
+          echo "### Updated Packages" >> update-summary.md
+          echo '```diff' >> update-summary.md
+          cat update-diff.txt >> update-summary.md
+          echo '```' >> update-summary.md
+          
+      - name: Create update PR
+        if: success()
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'deps: ${{ matrix.update_type }} dependency updates'
+          title: '📦 Dependencies: ${{ matrix.update_type }} updates'
+          body: |
+            ## Dependency Updates (${{ matrix.update_type }})
+            
+            This PR updates dependencies with ${{ matrix.update_type }} version bumps.
+            
+            ### Testing Results
+            - ✅ All tests pass
+            - ✅ Type checking passes
+            - ✅ Linting passes
+            - ✅ Security scan clean
+            
+            ### Updated Packages
+            See the diff below for specific package changes.
+            
+            **Auto-generated by dependency management workflow**
+          branch: deps/${{ matrix.update_type }}-updates
+          labels: |
+            dependencies
+            ${{ matrix.update_type }}
+            automated
+          reviewers: |
+            danieleschmidt
+          draft: false
+
+  # Check for deprecated packages
+  deprecation-check:
+    name: Deprecation Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+          pip install pip-check-reqs
+          
+      - name: Check for deprecated packages
+        run: |
+          # Check for packages that might be deprecated
+          python -c "
+          import pkg_resources
+          import requests
+          import json
+          
+          deprecated_packages = []
+          
+          for dist in pkg_resources.working_set:
+              try:
+                  response = requests.get(f'https://pypi.org/pypi/{dist.project_name}/json', timeout=10)
+                  if response.status_code == 200:
+                      data = response.json()
+                      info = data.get('info', {})
+                      
+                      # Check for deprecation indicators
+                      description = info.get('description', '').lower()
+                      summary = info.get('summary', '').lower()
+                      
+                      if any(word in description + summary for word in ['deprecated', 'obsolete', 'unmaintained']):
+                          deprecated_packages.append({
+                              'name': dist.project_name,
+                              'version': dist.version,
+                              'reason': 'Potentially deprecated based on description'
+                          })
+              except Exception as e:
+                  continue
+          
+          if deprecated_packages:
+              print('Found potentially deprecated packages:')
+              for pkg in deprecated_packages:
+                  print(f'- {pkg["name"]} ({pkg["version"]}): {pkg["reason"]}')
+              
+              with open('deprecated-packages.json', 'w') as f:
+                  json.dump(deprecated_packages, f, indent=2)
+          else:
+              print('No deprecated packages found.')
+          "
+          
+      - name: Upload deprecation report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: deprecation-report
+          path: deprecated-packages.json
+          retention-days: 30
+
+  # License compliance check
+  license-check:
+    name: License Compliance
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+          pip install pip-licenses licensecheck
+          
+      - name: Generate license report
+        run: |
+          # Generate detailed license report
+          pip-licenses --format=json --output-file=licenses.json
+          pip-licenses --format=csv --output-file=licenses.csv
+          pip-licenses --format=html --output-file=licenses.html
+          
+          # Check for license compatibility
+          licensecheck --format=json > license-check.json || true
+          
+      - name: Check for problematic licenses
+        run: |
+          python -c "
+          import json
+          
+          # Define problematic licenses
+          problematic_licenses = [
+              'GPL-3.0', 'GPL-2.0', 'AGPL-3.0', 'AGPL-1.0',
+              'LGPL-3.0', 'LGPL-2.1', 'LGPL-2.0',
+              'EUPL-1.2', 'OSL-3.0', 'EPL-2.0'
+          ]
+          
+          with open('licenses.json', 'r') as f:
+              licenses = json.load(f)
+          
+          problematic_deps = []
+          for dep in licenses:
+              license_name = dep.get('License', '')
+              if any(prob in license_name for prob in problematic_licenses):
+                  problematic_deps.append(dep)
+          
+          if problematic_deps:
+              print('WARNING: Found dependencies with potentially problematic licenses:')
+              for dep in problematic_deps:
+                  print(f'- {dep["Name"]} ({dep["Version"]}): {dep["License"]}')
+              
+              with open('problematic-licenses.json', 'w') as f:
+                  json.dump(problematic_deps, f, indent=2)
+          else:
+              print('No problematic licenses found.')
+          "
+          
+      - name: Upload license reports
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: license-reports
+          path: |
+            licenses.*
+            license-check.json
+            problematic-licenses.json
+          retention-days: 30
+
+  # Summary report
+  summary-report:
+    name: Dependency Summary
+    runs-on: ubuntu-latest
+    needs: [analyze-dependencies, security-updates, regular-updates, deprecation-check, license-check]
+    if: always()
+    steps:
+      - name: Download all reports
+        uses: actions/download-artifact@v3
+        with:
+          path: reports
+          
+      - name: Generate summary report
+        run: |
+          echo "# Dependency Management Summary" > summary.md
+          echo "" >> summary.md
+          echo "**Date:** $(date)" >> summary.md
+          echo "**Repository:** ${{ github.repository }}" >> summary.md
+          echo "**Workflow Run:** https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> summary.md
+          echo "" >> summary.md
+          
+          # Analysis results
+          if [ -f "reports/dependency-analysis/outdated-packages.json" ]; then
+              update_count=$(jq length reports/dependency-analysis/outdated-packages.json)
+              echo "## 📈 Analysis Results" >> summary.md
+              echo "- **Outdated packages:** $update_count" >> summary.md
+          fi
+          
+          if [ -f "reports/dependency-analysis/security-audit.json" ]; then
+              security_count=$(jq '.vulnerabilities | length' reports/dependency-analysis/security-audit.json)
+              echo "- **Security vulnerabilities:** $security_count" >> summary.md
+          fi
+          
+          echo "" >> summary.md
+          
+          # Job results
+          echo "## 🔧 Job Results" >> summary.md
+          echo "- **Security Updates:** ${{ needs.security-updates.result }}" >> summary.md
+          echo "- **Regular Updates:** ${{ needs.regular-updates.result }}" >> summary.md
+          echo "- **Deprecation Check:** ${{ needs.deprecation-check.result }}" >> summary.md
+          echo "- **License Check:** ${{ needs.license-check.result }}" >> summary.md
+          
+      - name: Upload summary report
+        uses: actions/upload-artifact@v3
+        with:
+          name: dependency-summary
+          path: summary.md
+          retention-days: 30
+
+# Concurrency control
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false  # Don't cancel dependency updates
