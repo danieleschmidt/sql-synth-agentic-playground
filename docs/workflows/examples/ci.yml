@@ -1,0 +1,462 @@
+# Comprehensive CI/CD Pipeline for SQL Synth Agentic Playground
+# This workflow must be manually created at .github/workflows/ci.yml
+
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Skip test execution'
+        required: false
+        default: 'false'
+        type: boolean
+      deploy_environment:
+        description: 'Environment to deploy to'
+        required: false
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+
+env:
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '18'
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # Pre-flight checks
+  preflight:
+    name: Pre-flight Checks
+    runs-on: ubuntu-latest
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+      changed_files: ${{ steps.changes.outputs.changed_files }}
+      has_python_changes: ${{ steps.changes.outputs.python }}
+      has_docker_changes: ${{ steps.changes.outputs.docker }}
+      has_docs_changes: ${{ steps.changes.outputs.docs }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Skip duplicate actions
+        id: skip_check
+        uses: fkirc/skip-duplicate-actions@v5
+        with:
+          concurrent_skipping: 'same_content_newer'
+          skip_after_successful_duplicate: 'true'
+          
+      - name: Detect changes
+        id: changes
+        uses: dorny/paths-filter@v2
+        with:
+          list-files: 'csv'
+          filters: |
+            python:
+              - '**/*.py'
+              - 'requirements.txt'
+              - 'pyproject.toml'
+              - 'pytest.ini'
+            docker:
+              - 'Dockerfile*'
+              - 'docker-compose*.yml'
+              - '.dockerignore'
+            docs:
+              - 'docs/**'
+              - '*.md'
+              - '.github/**/*.md'
+            config:
+              - 'config/**'
+              - '.pre-commit-config.yaml'
+              - '.editorconfig'
+
+  # Code quality and security checks
+  code-quality:
+    name: Code Quality & Security
+    runs-on: ubuntu-latest
+    needs: preflight
+    if: needs.preflight.outputs.should_skip != 'true'
+    strategy:
+      matrix:
+        check: [lint, typecheck, security, format]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          
+      - name: Cache pre-commit
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+          restore-keys: pre-commit-
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+          
+      - name: Run linting
+        if: matrix.check == 'lint'
+        run: |
+          ruff check . --output-format=github
+          
+      - name: Run type checking
+        if: matrix.check == 'typecheck'
+        run: |
+          mypy src/ --junit-xml=mypy-results.xml
+          
+      - name: Run security checks
+        if: matrix.check == 'security'
+        run: |
+          bandit -r src/ -f json -o bandit-results.json
+          safety check --json --output safety-results.json
+          
+      - name: Check code formatting
+        if: matrix.check == 'format'
+        run: |
+          black --check --diff .
+          isort --check-only --diff .
+          
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: code-quality-${{ matrix.check }}
+          path: '*-results.*'
+          retention-days: 30
+
+  # Unit and integration tests
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    needs: [preflight, code-quality]
+    if: needs.preflight.outputs.should_skip != 'true' && github.event.inputs.skip_tests != 'true'
+    strategy:
+      matrix:
+        test-type: [unit, integration, security]
+      fail-fast: false
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_USER: test_user
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+          
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+          
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+          
+      - name: Set up test environment
+        run: |
+          cp .env.example .env
+          echo "DATABASE_URL=postgresql://test_user:test_password@localhost:5432/test_db" >> .env
+          echo "REDIS_URL=redis://localhost:6379/0" >> .env
+          echo "TESTING=true" >> .env
+          
+      - name: Run unit tests
+        if: matrix.test-type == 'unit'
+        run: |
+          pytest tests/unit/ -v \
+            --junitxml=junit-unit.xml \
+            --cov=src \
+            --cov-report=xml:coverage-unit.xml \
+            --cov-report=html:htmlcov-unit \
+            --cov-fail-under=80
+            
+      - name: Run integration tests
+        if: matrix.test-type == 'integration'
+        run: |
+          pytest tests/integration/ -v \
+            --junitxml=junit-integration.xml \
+            --cov=src \
+            --cov-report=xml:coverage-integration.xml \
+            --cov-report=html:htmlcov-integration
+            
+      - name: Run security tests
+        if: matrix.test-type == 'security'
+        run: |
+          pytest tests/ -m security -v \
+            --junitxml=junit-security.xml
+            
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results-${{ matrix.test-type }}
+          path: |
+            junit-*.xml
+            coverage-*.xml
+            htmlcov-*
+          retention-days: 30
+          
+      - name: Upload coverage to Codecov
+        if: matrix.test-type == 'unit'
+        uses: codecov/codecov-action@v3
+        with:
+          file: coverage-unit.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+  # Performance and load testing
+  performance:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: [preflight, test]
+    if: needs.preflight.outputs.should_skip != 'true' && (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+          
+      - name: Run performance tests
+        run: |
+          pytest tests/performance/ -v \
+            --junitxml=junit-performance.xml \
+            --benchmark-json=benchmark-results.json
+            
+      - name: Upload performance results
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-results
+          path: |
+            junit-performance.xml
+            benchmark-results.json
+          retention-days: 30
+
+  # Build and test Docker images
+  docker-build:
+    name: Docker Build & Test
+    runs-on: ubuntu-latest
+    needs: [preflight, code-quality]
+    if: needs.preflight.outputs.should_skip != 'true' && needs.preflight.outputs.has_docker_changes == 'true'
+    strategy:
+      matrix:
+        target: [production, development]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      - name: Login to Docker Hub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+          
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: danieleschmidt/sql-synth-agentic-playground
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+            
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: ${{ matrix.target }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+          
+      - name: Test Docker image
+        run: |
+          docker run --rm \
+            -e TESTING=true \
+            danieleschmidt/sql-synth-agentic-playground:${{ github.sha }} \
+            python -c "import src.sql_synth; print('Import successful')"
+            
+      - name: Run security scan on image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: danieleschmidt/sql-synth-agentic-playground:${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # Generate and upload SBOM
+  sbom:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+    needs: [preflight, docker-build]
+    if: needs.preflight.outputs.should_skip != 'true' && github.event_name == 'push'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          
+      - name: Install SBOM tools
+        run: |
+          pip install cyclonedx-bom pip-licenses
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+          
+      - name: Generate SBOM
+        run: |
+          ./scripts/generate-sbom.sh --output-dir sbom-artifacts
+          
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v3
+        with:
+          name: sbom-${{ github.sha }}
+          path: sbom-artifacts/
+          retention-days: 90
+          
+      - name: Upload SBOM to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            sql-synth-agentic-playground-sbom-*.tar.gz
+            sql-synth-agentic-playground-sbom-*.tar.gz.sha256
+
+  # Deploy to staging/production
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: [test, docker-build, sbom]
+    if: |
+      github.event_name == 'push' && 
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') &&
+      needs.test.result == 'success'
+    environment:
+      name: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Deploy to environment
+        id: deploy
+        run: |
+          # Add deployment logic here
+          echo "Deploying to ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}"
+          echo "url=https://sql-synth-${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}.example.com" >> $GITHUB_OUTPUT
+          
+      - name: Run smoke tests
+        run: |
+          # Add smoke tests here
+          curl -f ${{ steps.deploy.outputs.url }}/health || exit 1
+          
+      - name: Notify deployment
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#deployments'
+          text: |
+            Deployment to ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}: ${{ job.status }}
+            URL: ${{ steps.deploy.outputs.url }}
+            Commit: ${{ github.sha }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # Cleanup
+  cleanup:
+    name: Cleanup
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    if: always()
+    steps:
+      - name: Clean up old artifacts
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const artifacts = await github.rest.actions.listArtifactsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            
+            const oldArtifacts = artifacts.data.artifacts.filter(artifact => {
+              const age = Date.now() - new Date(artifact.created_at).getTime();
+              return age > 7 * 24 * 60 * 60 * 1000; // 7 days
+            });
+            
+            for (const artifact of oldArtifacts) {
+              await github.rest.actions.deleteArtifact({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                artifact_id: artifact.id,
+              });
+            }
+
+# Concurrency control
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}

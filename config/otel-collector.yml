@@ -1,0 +1,292 @@
+# OpenTelemetry Collector Configuration
+# Collects traces, metrics, and logs from the SQL Synth application
+
+receivers:
+  # OTLP receiver for applications using OpenTelemetry SDKs
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+        cors:
+          allowed_origins:
+            - "*"
+          allowed_headers:
+            - "*"
+
+  # Prometheus receiver to scrape metrics
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: 'sql-synth-app'
+          static_configs:
+            - targets: ['sql-synth-app:9090']
+          scrape_interval: 30s
+          metrics_path: '/metrics'
+        
+        - job_name: 'postgres'
+          static_configs:
+            - targets: ['postgres:5432']
+          scrape_interval: 30s
+          
+        - job_name: 'redis'
+          static_configs:
+            - targets: ['redis:6379']
+          scrape_interval: 30s
+
+  # Host metrics receiver
+  hostmetrics:
+    collection_interval: 30s
+    scrapers:
+      cpu:
+        metrics:
+          system.cpu.utilization:
+            enabled: true
+      disk:
+      filesystem:
+      load:
+      memory:
+      network:
+      process:
+        mute_process_name_error: true
+        mute_process_exe_error: true
+        mute_process_io_error: true
+
+  # Docker stats receiver
+  docker_stats:
+    endpoint: unix:///var/run/docker.sock
+    collection_interval: 30s
+    timeout: 20s
+    api_version: 1.40
+    container_labels_to_metric_labels:
+      container.name: name
+      container.image.name: image
+      container.runtime: runtime
+
+  # Filelog receiver for application logs
+  filelog:
+    include:
+      - /app/logs/*.log
+      - /var/log/containers/*.log
+    include_file_name: false
+    include_file_path: true
+    operators:
+      - type: json_parser
+        id: parser-json
+        output: extract_timestamp_parser
+      - type: time_parser
+        id: extract_timestamp_parser
+        parse_from: attributes.timestamp
+        layout: '%Y-%m-%dT%H:%M:%S.%fZ'
+        output: severity_parser
+      - type: severity_parser
+        id: severity_parser
+        parse_from: attributes.level
+        mapping:
+          debug: debug
+          info: info
+          warn: warn
+          warning: warn
+          error: error
+          fatal: fatal
+
+processors:
+  # Batch processor for better performance
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+    send_batch_max_size: 2048
+
+  # Memory limiter to prevent OOM
+  memory_limiter:
+    limit_mib: 512
+    spike_limit_mib: 128
+    check_interval: 5s
+
+  # Resource processor to add metadata
+  resource:
+    attributes:
+      - key: service.name
+        value: sql-synth-agentic-playground
+        action: insert
+      - key: service.version
+        value: 0.1.0
+        action: insert
+      - key: deployment.environment
+        value: production
+        action: insert
+      - key: service.namespace
+        value: sql-synth
+        action: insert
+
+  # Attributes processor for trace enrichment
+  attributes:
+    actions:
+      - key: http.user_agent
+        action: delete
+      - key: sql.query
+        action: hash
+      - key: environment
+        value: production
+        action: insert
+
+  # Span processor for trace sampling
+  probabilistic_sampler:
+    sampling_percentage: 10  # Sample 10% of traces
+
+  # K8s attributes processor (if running in Kubernetes)
+  k8sattributes:
+    auth_type: "serviceAccount"
+    passthrough: false
+    filter:
+      node_from_env_var: KUBE_NODE_NAME
+    extract:
+      metadata:
+        - k8s.pod.name
+        - k8s.pod.uid
+        - k8s.deployment.name
+        - k8s.namespace.name
+        - k8s.node.name
+        - k8s.pod.start_time
+      labels:
+        - tag_name: app.label.component
+          key: app.kubernetes.io/component
+          from: pod
+
+exporters:
+  # Jaeger exporter for traces
+  jaeger:
+    endpoint: jaeger:14250
+    tls:
+      insecure: true
+
+  # Prometheus exporter for metrics
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+    namespace: sql_synth
+    const_labels:
+      service: sql-synth-agentic-playground
+    send_timestamps: true
+    metric_expiration: 180m
+    enable_open_metrics: true
+
+  # Logging exporter for debugging
+  logging:
+    loglevel: info
+    sampling_initial: 5
+    sampling_thereafter: 200
+
+  # OTLP exporter for external observability platforms
+  otlp:
+    endpoint: "https://otlp.example.com:4317"
+    headers:
+      api-key: "${OTEL_EXPORTER_OTLP_HEADERS}"
+    tls:
+      insecure: false
+    compression: gzip
+    timeout: 30s
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 30s
+      max_elapsed_time: 300s
+
+  # Elasticsearch exporter for logs
+  elasticsearch:
+    endpoints:
+      - http://elasticsearch:9200
+    index: sql-synth-logs
+    pipeline: sql-synth-pipeline
+    timeout: 30s
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 30s
+
+  # File exporter for local storage
+  file:
+    path: /tmp/otel-output.json
+    rotation:
+      max_megabytes: 100
+      max_days: 3
+      max_backups: 3
+
+connectors:
+  # Span metrics connector to generate metrics from traces
+  spanmetrics:
+    histogram_buckets: [2ms, 8ms, 50ms, 100ms, 200ms, 500ms, 1s, 2s, 5s, 10s]
+    dimensions:
+      - name: http.method
+        default: GET
+      - name: http.status_code
+      - name: sql.operation
+      - name: db.name
+    exemplars:
+      enabled: true
+    metrics_flush_interval: 30s
+
+service:
+  # Configure pipelines
+  pipelines:
+    # Traces pipeline
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, attributes, probabilistic_sampler, batch]
+      exporters: [jaeger, spanmetrics, logging]
+
+    # Metrics pipeline
+    metrics:
+      receivers: [otlp, prometheus, hostmetrics, docker_stats, spanmetrics]
+      processors: [memory_limiter, resource, batch]
+      exporters: [prometheus, logging]
+
+    # Logs pipeline
+    logs:
+      receivers: [otlp, filelog]
+      processors: [memory_limiter, resource, batch]
+      exporters: [elasticsearch, logging]
+
+  # Extensions for health checks and profiling
+  extensions: [health_check, pprof, zpages]
+
+  # Telemetry configuration
+  telemetry:
+    logs:
+      level: "info"
+      development: false
+      sampling:
+        enabled: true
+        tick: 10s
+        initial: 5
+        thereafter: 200
+      encoding: "json"
+    metrics:
+      level: detailed
+      address: 0.0.0.0:8888
+    traces:
+      processors:
+        - batch:
+            timeout: 1s
+            send_batch_size: 1024
+
+extensions:
+  # Health check extension
+  health_check:
+    endpoint: 0.0.0.0:13133
+    path: "/health"
+    check_collector_pipeline:
+      enabled: true
+      interval: "5m"
+      exporter_failure_threshold: 5
+
+  # Performance profiling extension
+  pprof:
+    endpoint: 0.0.0.0:1777
+    block_profile_fraction: 0
+    mutex_profile_fraction: 0
+    save_to_file: "/tmp/pprof-collector.pprof"
+
+  # zPages extension for debugging
+  zpages:
+    endpoint: 0.0.0.0:55679
