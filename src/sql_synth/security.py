@@ -418,7 +418,7 @@ class SecurityAuditor:
     def _get_session_id(self) -> str:
         """Generate a session identifier for tracking."""
         # In a real implementation, this would come from the session management system
-        return hashlib.md5(str(datetime.now()).encode()).hexdigest()[:8]
+        return hashlib.sha256(str(datetime.now()).encode()).hexdigest()[:16]
     
     def get_security_summary(self) -> Dict[str, Any]:
         """Get summary of recent security events."""

@@ -7,17 +7,17 @@ from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 import psutil
 import streamlit as st
-from src.sql_synth.database import DatabaseManager
-from src.sql_synth.monitoring import MetricsCollector
+from src.sql_synth.database import DatabaseManager, get_database_manager
+from src.sql_synth.metrics import global_metrics
 
 
 class HealthChecker:
     """Provides health check functionality for the application."""
 
-    def __init__(self):
+    def __init__(self, database_manager: Optional[DatabaseManager] = None):
         self.start_time = time.time()
-        self.metrics_collector = MetricsCollector()
-        self.database_manager = DatabaseManager()
+        self.metrics_collector = global_metrics
+        self.database_manager = database_manager
 
     def get_basic_health(self) -> Dict[str, Any]:
         """Get basic health status."""
@@ -64,28 +64,28 @@ class HealthChecker:
 
     def _check_database_health(self) -> Dict[str, Any]:
         """Check database connectivity and performance."""
+        if not self.database_manager:
+            return {
+                "healthy": False,
+                "message": "No database manager configured (demo mode)"
+            }
+        
         try:
-            start_time = time.time()
-            
-            # Try to connect and run a simple query
-            with self.database_manager.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT 1")
-                result = cursor.fetchone()
-            
-            response_time = time.time() - start_time
+            # Use the database manager's test connection method
+            connection_result = self.database_manager.test_connection()
             
             return {
-                "healthy": True,
-                "response_time_ms": round(response_time * 1000, 2),
-                "message": "Database connection successful"
+                "healthy": connection_result["success"],
+                "response_time_ms": round(connection_result.get("connection_time", 0) * 1000, 2),
+                "message": "Database connection successful" if connection_result["success"] else "Database connection failed",
+                "details": connection_result
             }
             
         except Exception as e:
             return {
                 "healthy": False,
                 "error": str(e),
-                "message": "Database connection failed"
+                "message": "Database health check failed"
             }
 
     def _check_system_health(self) -> Dict[str, Any]:
@@ -132,27 +132,29 @@ class HealthChecker:
         """Check application-specific health metrics."""
         try:
             # Get application metrics
-            metrics = self.metrics_collector.get_current_metrics()
+            metrics_summary = self.metrics_collector.get_summary()
+            performance = metrics_summary.get("performance", {})
             
             # Check for any critical errors in recent time window
-            error_rate = metrics.get("error_rate", 0.0)
-            response_time_avg = metrics.get("avg_response_time", 0.0)
+            success_rate = performance.get("success_rate", 1.0)
+            avg_generation_time = performance.get("avg_generation_time", 0.0)
+            total_queries = performance.get("total_queries", 0)
             
             # Define health thresholds
-            error_rate_healthy = error_rate < 0.05  # Less than 5% error rate
-            response_time_healthy = response_time_avg < 5.0  # Less than 5 seconds avg
+            success_rate_healthy = success_rate >= 0.95  # At least 95% success rate
+            response_time_healthy = avg_generation_time < 10.0  # Less than 10 seconds avg
             
-            overall_healthy = error_rate_healthy and response_time_healthy
+            overall_healthy = success_rate_healthy and response_time_healthy
             
             return {
                 "healthy": overall_healthy,
-                "error_rate": error_rate,
-                "avg_response_time_ms": round(response_time_avg * 1000, 2),
-                "total_requests": metrics.get("total_requests", 0),
-                "active_sessions": metrics.get("active_sessions", 0),
+                "success_rate": success_rate,
+                "avg_generation_time_ms": round(avg_generation_time * 1000, 2),
+                "total_queries": total_queries,
+                "last_24h_queries": performance.get("last_24h_queries", 0),
                 "thresholds": {
-                    "max_error_rate": 0.05,
-                    "max_avg_response_time_ms": 5000
+                    "min_success_rate": 0.95,
+                    "max_avg_generation_time_ms": 10000
                 }
             }
             
@@ -201,10 +203,10 @@ class HealthChecker:
     def get_metrics(self) -> Dict[str, Any]:
         """Get application metrics in Prometheus format."""
         try:
-            metrics = self.metrics_collector.get_prometheus_metrics()
+            metrics_summary = self.metrics_collector.get_summary()
             return {
                 "status": "success",
-                "metrics": metrics,
+                "metrics": metrics_summary,
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
         except Exception as e:

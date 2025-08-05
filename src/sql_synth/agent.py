@@ -17,8 +17,10 @@ from sqlalchemy import Engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from .database import DatabaseManager
-from .security import SecurityValidator
+from .security import security_auditor
 from .metrics import QueryMetrics
+from .cache import cache_generation_result, cache_query_result, cache_manager
+from .concurrent import concurrent_task
 
 logger = logging.getLogger(__name__)
 
@@ -56,8 +58,8 @@ class SQLSynthesisAgent:
         self.temperature = temperature
         self.max_retries = max_retries
         
-        # Initialize security validator
-        self.security_validator = SecurityValidator()
+        # Use global security auditor
+        self.security_validator = security_auditor
         
         # Initialize metrics tracker
         self.metrics = QueryMetrics()
@@ -99,6 +101,8 @@ class SQLSynthesisAgent:
             logger.exception("Failed to create SQL agent")
             raise RuntimeError(f"SQL agent creation failed: {e}") from e
 
+    @cache_generation_result(ttl=3600)
+    @concurrent_task(timeout=30)
     def generate_sql(self, natural_language_query: str) -> dict[str, Any]:
         """Generate SQL from natural language query.
 
@@ -125,9 +129,10 @@ class SQLSynthesisAgent:
             sql_query = self._extract_sql_from_result(result)
             
             # Security validation
-            security_result = self.security_validator.validate_query(sql_query)
-            if not security_result.is_safe:
-                raise ValueError(f"Security validation failed: {security_result.reason}")
+            is_safe, violations = self.security_validator.audit_generated_query(sql_query)
+            if not is_safe:
+                violation_reasons = [str(v) for v in violations]
+                raise ValueError(f"Security validation failed: {'; '.join(violation_reasons)}")
             
             # Additional validations
             self._validate_generated_sql(sql_query)
@@ -180,6 +185,7 @@ class SQLSynthesisAgent:
                 },
             }
 
+    @cache_query_result(ttl=1800)
     def execute_sql(self, sql_query: str, limit: int = 100) -> dict[str, Any]:
         """Execute SQL query with safety checks.
 
@@ -198,9 +204,10 @@ class SQLSynthesisAgent:
         
         try:
             # Security validation
-            security_result = self.security_validator.validate_query(sql_query)
-            if not security_result.is_safe:
-                raise ValueError(f"Security validation failed: {security_result.reason}")
+            is_safe, violations = self.security_validator.audit_generated_query(sql_query)
+            if not is_safe:
+                violation_reasons = [str(v) for v in violations]
+                raise ValueError(f"Security validation failed: {'; '.join(violation_reasons)}")
             
             # Add LIMIT clause if not present and not a metadata query
             limited_query = self._add_limit_if_needed(sql_query, limit)
