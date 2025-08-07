@@ -27,12 +27,19 @@ class StreamlitUI:
 
     def render_header(self) -> None:
         """Render the application header and description."""
-        st.title("SQL Synthesis Agent")
+        st.title("🧠 Sentiment-Aware SQL Synthesis Agent")
         st.markdown("""
-        🔍 **Natural Language to SQL Converter**
+        🔍 **Intelligent Natural Language to SQL Converter**
 
-        Enter your query in plain English, and I'll convert it to SQL and 
-        execute it against your database.
+        Enter your query in plain English, and I'll analyze the emotional context 
+        and intent to generate optimized SQL queries tailored to your needs.
+        
+        **✨ Features:**
+        - 🎭 Sentiment analysis for query understanding
+        - 🧠 Intent detection (analytical, exploratory, investigative)  
+        - ⏰ Temporal bias detection (recent, historical, trending)
+        - 📊 Magnitude bias detection (top, bottom, extreme)
+        - 🛡️ Security validation and SQL injection prevention
         """)
 
     def render_input_form(self) -> tuple[str, bool]:
@@ -45,9 +52,9 @@ class StreamlitUI:
 
         user_query = st.text_area(
             "Describe what data you want to retrieve:",
-            placeholder="e.g., Show me all active users from the last 30 days",
-            height=100,
-            help="Type your query in natural language. Be as specific as possible.",
+            placeholder="e.g., Show me the best performing products this month, or Find problematic orders that need attention",
+            height=120,
+            help="Type your query in natural language. The system will analyze emotional context and intent for better SQL generation.",
         )
 
         submit_clicked = st.button(
@@ -100,6 +107,81 @@ class StreamlitUI:
             message: Success message to display
         """
         st.success(message)
+        
+    def render_sentiment_analysis(self, sentiment_data: dict) -> None:
+        """Render sentiment analysis results.
+        
+        Args:
+            sentiment_data: Dictionary containing sentiment analysis results
+        """
+        st.subheader("🎭 Sentiment Analysis")
+        
+        # Create columns for layout
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            # Sentiment polarity with color coding
+            polarity = sentiment_data.get("polarity", "neutral")
+            polarity_colors = {
+                "very_positive": "🟢",
+                "positive": "🔵", 
+                "neutral": "⚪",
+                "negative": "🟠",
+                "very_negative": "🔴"
+            }
+            st.metric(
+                "Sentiment",
+                f"{polarity_colors.get(polarity, '⚪')} {polarity.replace('_', ' ').title()}",
+                f"{sentiment_data.get('compound_score', 0):.3f}"
+            )
+        
+        with col2:
+            # Intent with icon
+            intent = sentiment_data.get("intent", "analytical")
+            intent_icons = {
+                "analytical": "📊",
+                "exploratory": "🔍", 
+                "investigative": "🕵️",
+                "comparative": "⚖️",
+                "trending": "📈",
+                "problem_solving": "🛠️"
+            }
+            st.metric(
+                "Query Intent",
+                f"{intent_icons.get(intent, '📊')} {intent.replace('_', ' ').title()}",
+                f"Confidence: {sentiment_data.get('confidence', 0):.2f}"
+            )
+            
+        with col3:
+            # Biases
+            temporal_bias = sentiment_data.get("temporal_bias")
+            magnitude_bias = sentiment_data.get("magnitude_bias") 
+            
+            biases = []
+            if temporal_bias:
+                biases.append(f"⏰ {temporal_bias}")
+            if magnitude_bias:
+                biases.append(f"📊 {magnitude_bias}")
+            
+            bias_text = " | ".join(biases) if biases else "None detected"
+            st.metric("Detected Biases", bias_text)
+        
+        # Emotional keywords
+        keywords = sentiment_data.get("emotional_keywords", [])
+        if keywords:
+            st.markdown(f"**🏷️ Emotional Keywords:** {', '.join(keywords)}")
+        
+        # Detailed scores (collapsible)
+        with st.expander("📈 Detailed Sentiment Scores"):
+            scores_col1, scores_col2, scores_col3 = st.columns(3)
+            with scores_col1:
+                st.metric("Positive", f"{sentiment_data.get('positive', 0):.3f}")
+            with scores_col2:
+                st.metric("Neutral", f"{sentiment_data.get('neutral', 0):.3f}")  
+            with scores_col3:
+                st.metric("Negative", f"{sentiment_data.get('negative', 0):.3f}")
+                
+        st.markdown("---")
 
 
 def display_query_results(results: Optional[pd.DataFrame]) -> None:

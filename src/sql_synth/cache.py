@@ -15,6 +15,9 @@ from collections import OrderedDict
 import json
 import pickle
 
+from .performance_optimizer import adaptive_cache_strategy, performance_monitor
+from .exceptions import CacheError, create_error_context
+
 
 logger = logging.getLogger(__name__)
 
