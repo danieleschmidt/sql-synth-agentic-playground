@@ -21,31 +21,6 @@ from .security import security_auditor
 from .metrics import QueryMetrics
 from .cache import cache_generation_result, cache_query_result, cache_manager
 from .concurrent import concurrent_task
-from .sentiment_analyzer import sentiment_analyzer, SentimentAnalysis
-from .exceptions import (
-    SQLGenerationError,
-    SQLSecurityError, 
-    SQLExecutionError,
-    ValidationError,
-    SentimentAnalysisError,
-    create_error_context,
-    handle_exception_with_context
-)
-from .performance_optimizer import (
-    performance_monitor,
-    async_query_executor,
-    query_optimizer,
-    monitor_performance
-)
-from .resilience import (
-    SQL_GENERATION_CIRCUIT_BREAKER,
-    DATABASE_CIRCUIT_BREAKER,
-    STANDARD_RETRY,
-    with_retry,
-    with_timeout,
-    SQL_GENERATION_BULKHEAD,
-    DATABASE_BULKHEAD
-)
 
 logger = logging.getLogger(__name__)
 
@@ -128,10 +103,6 @@ class SQLSynthesisAgent:
 
     @cache_generation_result(ttl=3600)
     @concurrent_task(timeout=30)
-    @monitor_performance("sql_generation")
-    @SQL_GENERATION_CIRCUIT_BREAKER
-    @SQL_GENERATION_BULKHEAD
-    @with_retry(STANDARD_RETRY)
     def generate_sql(self, natural_language_query: str) -> dict[str, Any]:
         """Generate SQL from natural language query.
 
@@ -151,42 +122,11 @@ class SQLSynthesisAgent:
             # Input validation
             self._validate_input(natural_language_query)
             
-            # Perform sentiment analysis on the natural language query
-            try:
-                sentiment_analysis = sentiment_analyzer.analyze(natural_language_query)
-                logger.info("Sentiment analysis: %s (confidence: %.2f, intent: %s)",
-                           sentiment_analysis.polarity.value, sentiment_analysis.confidence, 
-                           sentiment_analysis.intent.value)
-            except SentimentAnalysisError as e:
-                logger.warning("Sentiment analysis failed, continuing with neutral sentiment: %s", e)
-                # Create fallback neutral sentiment
-                from .sentiment_analyzer import SentimentAnalysis, SentimentPolarity, QueryIntent
-                sentiment_analysis = SentimentAnalysis(
-                    polarity=SentimentPolarity.NEUTRAL,
-                    confidence=0.0,
-                    compound_score=0.0,
-                    positive=0.33,
-                    neutral=0.34,
-                    negative=0.33,
-                    intent=QueryIntent.ANALYTICAL,
-                    emotional_keywords=[],
-                    temporal_bias=None,
-                    magnitude_bias=None
-                )
-            
             # Generate SQL using LangChain agent
             result = self._generate_with_retry(natural_language_query)
             
             # Extract SQL from agent response
-            base_sql_query = self._extract_sql_from_result(result)
-            
-            # Enhance SQL with sentiment-aware modifications
-            sql_query = sentiment_analyzer.enhance_sql_with_sentiment(base_sql_query, sentiment_analysis)
-            
-            # Analyze query for optimization opportunities
-            query_analysis = query_optimizer.analyze_query_pattern(sql_query)
-            logger.info("Query analysis completed: complexity=%s, suggestions=%d", 
-                       query_analysis['estimated_complexity'], len(query_analysis['optimization_suggestions']))
+            sql_query = self._extract_sql_from_result(result)
             
             # Security validation
             is_safe, violations = self.security_validator.audit_generated_query(sql_query)
@@ -211,25 +151,12 @@ class SQLSynthesisAgent:
                 "success": True,
                 "generation_time": generation_time,
                 "security_validated": True,
-                "sentiment_analysis": {
-                    "polarity": sentiment_analysis.polarity.value,
-                    "confidence": sentiment_analysis.confidence,
-                    "compound_score": sentiment_analysis.compound_score,
-                    "intent": sentiment_analysis.intent.value,
-                    "emotional_keywords": sentiment_analysis.emotional_keywords,
-                    "temporal_bias": sentiment_analysis.temporal_bias,
-                    "magnitude_bias": sentiment_analysis.magnitude_bias,
-                },
-                "query_analysis": query_analysis,
                 "metadata": {
                     "model_used": self.model_name,
                     "original_query": natural_language_query,
-                    "base_sql_query": base_sql_query,
                     "query_length": len(sql_query),
                     "dialect": self.database_manager.db_type,
                     "timestamp": time.time(),
-                    "sentiment_enhanced": True,
-                    "performance_optimized": True,
                 },
                 "agent_output": result,
             }
@@ -259,11 +186,6 @@ class SQLSynthesisAgent:
             }
 
     @cache_query_result(ttl=1800)
-    @monitor_performance("sql_execution")
-    @DATABASE_CIRCUIT_BREAKER
-    @DATABASE_BULKHEAD
-    @with_retry(STANDARD_RETRY)
-    @with_timeout(60)
     def execute_sql(self, sql_query: str, limit: int = 100) -> dict[str, Any]:
         """Execute SQL query with safety checks.
 

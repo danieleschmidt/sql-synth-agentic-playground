@@ -21,10 +21,3 @@ mypy>=1.5.0
 # Benchmarking datasets
 datasets>=2.14.0
 requests>=2.31.0
-
-# Sentiment Analysis & NLP
-textblob>=0.17.1
-vaderSentiment>=3.3.2
-transformers>=4.30.0
-torch>=2.0.0
-scikit-learn>=1.3.0

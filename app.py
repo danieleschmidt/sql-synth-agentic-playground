@@ -66,56 +66,45 @@ def demo_mode_warning() -> None:
     """)
 
 
-def simulate_sentiment_aware_sql_generation(user_query: str) -> tuple[str, dict]:
-    """Simulate sentiment-aware SQL generation for demo purposes.
+def simulate_sql_generation(user_query: str) -> str:
+    """Simulate SQL generation for demo purposes.
 
     Args:
         user_query: Natural language query from user
 
     Returns:
-        Tuple of (SQL query, sentiment analysis dict)
+        Simulated SQL query
     """
-    from src.sql_synth.sentiment_analyzer import sentiment_analyzer
-    
-    # Perform actual sentiment analysis
-    sentiment_analysis = sentiment_analyzer.analyze(user_query)
-    
-    # Simple demo SQL generation based on keywords and sentiment
+    # Simple demo SQL generation based on keywords
     query_lower = user_query.lower()
-    base_sql = ""
 
     if "users" in query_lower:
         if "active" in query_lower:
-            base_sql = "SELECT * FROM users WHERE status = 'active' ORDER BY created_at DESC;"
-        else:
-            base_sql = "SELECT * FROM users ORDER BY created_at DESC LIMIT 100;"
-    elif "orders" in query_lower:
+            return (
+                "SELECT * FROM users WHERE status = 'active' "
+                "ORDER BY created_at DESC;"
+            )
+        return "SELECT * FROM users ORDER BY created_at DESC LIMIT 100;"
+    if "orders" in query_lower:
         if "today" in query_lower or "recent" in query_lower:
-            base_sql = "SELECT * FROM orders WHERE DATE(created_at) = CURRENT_DATE ORDER BY created_at DESC;"
-        else:
-            base_sql = "SELECT * FROM orders ORDER BY created_at DESC LIMIT 50;"
-    elif "products" in query_lower:
+            return (
+                "SELECT * FROM orders WHERE DATE(created_at) = CURRENT_DATE "
+                "ORDER BY created_at DESC;"
+            )
+        return "SELECT * FROM orders ORDER BY created_at DESC LIMIT 50;"
+    if "products" in query_lower:
         if "top" in query_lower or "best" in query_lower:
-            base_sql = "SELECT p.name, SUM(oi.quantity) as total_sold FROM products p JOIN order_items oi ON p.id = oi.product_id GROUP BY p.id ORDER BY total_sold DESC LIMIT 10;"
-        else:
-            base_sql = "SELECT * FROM products WHERE active = true ORDER BY name;"
-    else:
-        base_sql = f"-- Query: {user_query}\nSELECT 'Sentiment-aware SQL generation' as message, 'Configure database for full functionality' as note;"
-    
-    # Apply sentiment-based enhancements
-    enhanced_sql = sentiment_analyzer.enhance_sql_with_sentiment(base_sql, sentiment_analysis)
-    
-    sentiment_dict = {
-        "polarity": sentiment_analysis.polarity.value,
-        "confidence": sentiment_analysis.confidence,
-        "compound_score": sentiment_analysis.compound_score,
-        "intent": sentiment_analysis.intent.value,
-        "emotional_keywords": sentiment_analysis.emotional_keywords,
-        "temporal_bias": sentiment_analysis.temporal_bias,
-        "magnitude_bias": sentiment_analysis.magnitude_bias,
-    }
-    
-    return enhanced_sql, sentiment_dict
+            return (
+                "SELECT p.name, SUM(oi.quantity) as total_sold FROM products p "
+                "JOIN order_items oi ON p.id = oi.product_id "
+                "GROUP BY p.id ORDER BY total_sold DESC LIMIT 10;"
+            )
+        return "SELECT * FROM products WHERE active = true ORDER BY name;"
+    return (
+        f"-- Query: {user_query}\n"
+        "SELECT 'Demo query generation' as message, "
+        "'Configure database connection for real SQL synthesis' as note;"
+    )
 
 
 def create_demo_results(sql_query: str) -> pd.DataFrame:
@@ -200,19 +189,16 @@ def main() -> None:
     # Process query when submitted
     if submit_clicked and user_query.strip():
         try:
-            with st.spinner("Analyzing sentiment and generating SQL..."):
+            with st.spinner("Generating SQL..."):
                 if demo_mode:
-                    # Demo mode: simulate sentiment-aware SQL generation
-                    generated_sql, sentiment_data = simulate_sentiment_aware_sql_generation(user_query)
-                    ui.show_info("⚠️ Demo mode: Using actual sentiment analysis with simulated SQL generation")
+                    # Demo mode: simulate SQL generation
+                    generated_sql = simulate_sql_generation(user_query)
+                    ui.show_info("⚠️ Demo mode: SQL generated using simple rules")
                 else:
                     # Real mode: would integrate with LangChain agent here
-                    generated_sql, sentiment_data = simulate_sentiment_aware_sql_generation(user_query)  # Placeholder
-                    ui.show_info("🧠 Sentiment-aware SQL generation active! LangChain integration in progress")
+                    generated_sql = simulate_sql_generation(user_query)  # Placeholder
+                    ui.show_info("🔧 SQL Agent integration coming in next phase")
 
-                # Display sentiment analysis
-                ui.render_sentiment_analysis(sentiment_data)
-                
                 # Display generated SQL
                 ui.render_sql_output(generated_sql)
 
