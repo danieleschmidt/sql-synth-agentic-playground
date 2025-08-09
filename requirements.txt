@@ -21,3 +21,17 @@ mypy>=1.5.0
 # Benchmarking datasets
 datasets>=2.14.0
 requests>=2.31.0
+
+# Enhanced UI and visualization
+plotly>=5.15.0
+kaleido>=0.2.1
+
+# SQL parsing and analysis
+sqlparse>=0.4.4
+
+# System monitoring and performance
+psutil>=5.9.0
+
+# Scientific computing and statistics
+numpy>=1.21.0
+scipy>=1.7.0

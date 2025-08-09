@@ -322,4 +322,161 @@ class ConcurrentExecutor:
         except TimeoutError:
             logger.warning("Batch execution timed out after %.2fs", timeout or 0)
         
-        return results\n    \n    def get_performance_stats(self) -> Dict[str, Any]:\n        \"\"\"Get comprehensive performance statistics.\"\"\"\n        total_tasks = self.completed_tasks.get() + self.failed_tasks.get()\n        success_rate = self.completed_tasks.get() / total_tasks if total_tasks > 0 else 0.0\n        \n        # Calculate recent performance (last 100 tasks)\n        recent_results = self.task_results[-100:] if len(self.task_results) >= 100 else self.task_results\n        \n        if recent_results:\n            recent_times = [r.execution_time for r in recent_results]\n            avg_execution_time = statistics.mean(recent_times)\n            p95_execution_time = statistics.quantiles(recent_times, n=20)[18] if len(recent_times) > 20 else max(recent_times)\n        else:\n            avg_execution_time = 0.0\n            p95_execution_time = 0.0\n        \n        return {\n            \"active_tasks\": self.active_tasks.get(),\n            \"completed_tasks\": self.completed_tasks.get(),\n            \"failed_tasks\": self.failed_tasks.get(),\n            \"success_rate\": success_rate,\n            \"avg_execution_time\": avg_execution_time,\n            \"p95_execution_time\": p95_execution_time,\n            \"worker_count\": self.max_workers,\n            \"worker_utilization\": self.active_tasks.get() / self.max_workers,\n            \"load_balancer_stats\": self.load_balancer.get_load_stats(),\n            \"worker_stats\": {wid: {\n                \"tasks_completed\": ws.tasks_completed,\n                \"tasks_failed\": ws.tasks_failed,\n                \"avg_execution_time\": ws.avg_execution_time,\n                \"is_active\": ws.is_active,\n                \"last_task_time\": ws.last_task_time.isoformat() if ws.last_task_time else None\n            } for wid, ws in self.worker_stats.items()}\n        }\n    \n    def start_auto_scaling_monitor(self) -> None:\n        \"\"\"Start background thread for auto-scaling monitoring.\"\"\"\n        if self.auto_scaling_enabled and (self._monitoring_thread is None or not self._monitoring_thread.is_alive()):\n            self._shutdown_event.clear()\n            self._monitoring_thread = threading.Thread(target=self._auto_scaling_worker, daemon=True)\n            self._monitoring_thread.start()\n            logger.info(\"Auto-scaling monitor started\")\n    \n    def stop_auto_scaling_monitor(self) -> None:\n        \"\"\"Stop auto-scaling monitoring thread.\"\"\"\n        if self._monitoring_thread and self._monitoring_thread.is_alive():\n            self._shutdown_event.set()\n            self._monitoring_thread.join(timeout=5)\n            logger.info(\"Auto-scaling monitor stopped\")\n    \n    def _auto_scaling_worker(self) -> None:\n        \"\"\"Background worker for auto-scaling decisions.\"\"\"\n        while not self._shutdown_event.is_set():\n            try:\n                utilization = self.active_tasks.get() / self.max_workers\n                \n                # Scale up decision\n                if utilization > self.scale_up_threshold and self.max_workers < self.max_workers_limit:\n                    new_worker_count = min(self.max_workers + 1, self.max_workers_limit)\n                    self._scale_workers(new_worker_count)\n                    logger.info(\"Scaled up to %d workers (utilization: %.2f)\", new_worker_count, utilization)\n                \n                # Scale down decision\n                elif utilization < self.scale_down_threshold and self.max_workers > self.min_workers:\n                    new_worker_count = max(self.max_workers - 1, self.min_workers)\n                    self._scale_workers(new_worker_count)\n                    logger.info(\"Scaled down to %d workers (utilization: %.2f)\", new_worker_count, utilization)\n                \n                # Wait before next check\n                self._shutdown_event.wait(30)  # Check every 30 seconds\n                \n            except Exception as e:\n                logger.error(\"Error in auto-scaling worker: %s\", str(e))\n                self._shutdown_event.wait(60)  # Wait longer on error\n    \n    def _scale_workers(self, new_count: int) -> None:\n        \"\"\"Scale the number of worker threads.\"\"\"\n        if new_count == self.max_workers:\n            return\n        \n        # Update worker count\n        old_count = self.max_workers\n        self.max_workers = new_count\n        \n        # Recreate thread pool with new size\n        old_executor = self.executor\n        self.executor = ThreadPoolExecutor(max_workers=new_count, thread_name_prefix=\"SQLSynth\")\n        \n        # Update load balancer\n        worker_ids = [f\"worker_{i}\" for i in range(new_count)]\n        self.load_balancer = LoadBalancer(worker_ids)\n        \n        # Update worker stats\n        if new_count > old_count:\n            # Add new workers\n            for i in range(old_count, new_count):\n                worker_id = f\"worker_{i}\"\n                self.worker_stats[worker_id] = WorkerStats(\n                    worker_id=worker_id,\n                    tasks_completed=0,\n                    tasks_failed=0,\n                    total_execution_time=0.0,\n                    avg_execution_time=0.0,\n                    last_task_time=None,\n                    is_active=False\n                )\n        else:\n            # Remove excess workers\n            for i in range(new_count, old_count):\n                worker_id = f\"worker_{i}\"\n                if worker_id in self.worker_stats:\n                    del self.worker_stats[worker_id]\n        \n        # Shutdown old executor gracefully\n        try:\n            old_executor.shutdown(wait=True, timeout=30)\n        except Exception as e:\n            logger.warning(\"Error shutting down old executor: %s\", str(e))\n    \n    def shutdown(self, wait: bool = True, timeout: Optional[float] = None) -> None:\n        \"\"\"Shutdown the concurrent executor.\"\"\"\n        logger.info(\"Shutting down concurrent executor...\")\n        \n        # Stop auto-scaling\n        self.stop_auto_scaling_monitor()\n        \n        # Shutdown thread pool\n        try:\n            self.executor.shutdown(wait=wait, timeout=timeout)\n            logger.info(\"Concurrent executor shutdown complete\")\n        except Exception as e:\n            logger.error(\"Error during executor shutdown: %s\", str(e))\n\n\n# Global concurrent executor instance\nconcurrent_executor = ConcurrentExecutor()\n\n\ndef get_concurrent_executor() -> ConcurrentExecutor:\n    \"\"\"Get global concurrent executor instance.\"\"\"\n    return concurrent_executor\n\n\n# Decorator for concurrent execution\ndef concurrent_task(timeout: Optional[float] = None):\n    \"\"\"Decorator to execute function concurrently.\"\"\"\n    def decorator(func):\n        def wrapper(*args, **kwargs):\n            # Submit task to concurrent executor\n            task_id = concurrent_executor.submit_task(func, *args, **kwargs)\n            \n            # For now, we'll execute synchronously and return the result\n            # In a real async environment, this would return a Future\n            return func(*args, **kwargs)\n        return wrapper\n    return decorator
+        return results
+    
+    def get_performance_stats(self) -> Dict[str, Any]:
+        """Get comprehensive performance statistics."""
+        total_tasks = self.completed_tasks.get() + self.failed_tasks.get()
+        success_rate = self.completed_tasks.get() / total_tasks if total_tasks > 0 else 0.0
+        
+        # Calculate recent performance (last 100 tasks)
+        recent_results = self.task_results[-100:] if len(self.task_results) >= 100 else self.task_results
+        
+        if recent_results:
+            recent_times = [r.execution_time for r in recent_results]
+            avg_execution_time = statistics.mean(recent_times)
+            p95_execution_time = statistics.quantiles(recent_times, n=20)[18] if len(recent_times) > 20 else max(recent_times)
+        else:
+            avg_execution_time = 0.0
+            p95_execution_time = 0.0
+        
+        return {
+            "active_tasks": self.active_tasks.get(),
+            "completed_tasks": self.completed_tasks.get(),
+            "failed_tasks": self.failed_tasks.get(),
+            "success_rate": success_rate,
+            "avg_execution_time": avg_execution_time,
+            "p95_execution_time": p95_execution_time,
+            "worker_count": self.max_workers,
+            "worker_utilization": self.active_tasks.get() / self.max_workers,
+            "load_balancer_stats": self.load_balancer.get_load_stats(),
+            "worker_stats": {wid: {
+                "tasks_completed": ws.tasks_completed,
+                "tasks_failed": ws.tasks_failed,
+                "avg_execution_time": ws.avg_execution_time,
+                "is_active": ws.is_active,
+                "last_task_time": ws.last_task_time.isoformat() if ws.last_task_time else None
+            } for wid, ws in self.worker_stats.items()}
+        }
+    
+    def start_auto_scaling_monitor(self) -> None:
+        """Start background thread for auto-scaling monitoring."""
+        if self.auto_scaling_enabled and (self._monitoring_thread is None or not self._monitoring_thread.is_alive()):
+            self._shutdown_event.clear()
+            self._monitoring_thread = threading.Thread(target=self._auto_scaling_worker, daemon=True)
+            self._monitoring_thread.start()
+            logger.info("Auto-scaling monitor started")
+    
+    def stop_auto_scaling_monitor(self) -> None:
+        """Stop auto-scaling monitoring thread."""
+        if self._monitoring_thread and self._monitoring_thread.is_alive():
+            self._shutdown_event.set()
+            self._monitoring_thread.join(timeout=5)
+            logger.info("Auto-scaling monitor stopped")
+    
+    def _auto_scaling_worker(self) -> None:
+        """Background worker for auto-scaling decisions."""
+        while not self._shutdown_event.is_set():
+            try:
+                utilization = self.active_tasks.get() / self.max_workers
+                
+                # Scale up decision
+                if utilization > self.scale_up_threshold and self.max_workers < self.max_workers_limit:
+                    new_worker_count = min(self.max_workers + 1, self.max_workers_limit)
+                    self._scale_workers(new_worker_count)
+                    logger.info("Scaled up to %d workers (utilization: %.2f)", new_worker_count, utilization)
+                
+                # Scale down decision
+                elif utilization < self.scale_down_threshold and self.max_workers > self.min_workers:
+                    new_worker_count = max(self.max_workers - 1, self.min_workers)
+                    self._scale_workers(new_worker_count)
+                    logger.info("Scaled down to %d workers (utilization: %.2f)", new_worker_count, utilization)
+                
+                # Wait before next check
+                self._shutdown_event.wait(30)  # Check every 30 seconds
+                
+            except Exception as e:
+                logger.error("Error in auto-scaling worker: %s", str(e))
+                self._shutdown_event.wait(60)  # Wait longer on error
+    
+    def _scale_workers(self, new_count: int) -> None:
+        """Scale the number of worker threads."""
+        if new_count == self.max_workers:
+            return
+        
+        # Update worker count
+        old_count = self.max_workers
+        self.max_workers = new_count
+        
+        # Recreate thread pool with new size
+        old_executor = self.executor
+        self.executor = ThreadPoolExecutor(max_workers=new_count, thread_name_prefix="SQLSynth")
+        
+        # Update load balancer
+        worker_ids = [f"worker_{i}" for i in range(new_count)]
+        self.load_balancer = LoadBalancer(worker_ids)
+        
+        # Update worker stats
+        if new_count > old_count:
+            # Add new workers
+            for i in range(old_count, new_count):
+                worker_id = f"worker_{i}"
+                self.worker_stats[worker_id] = WorkerStats(
+                    worker_id=worker_id,
+                    tasks_completed=0,
+                    tasks_failed=0,
+                    total_execution_time=0.0,
+                    avg_execution_time=0.0,
+                    last_task_time=None,
+                    is_active=False
+                )
+        else:
+            # Remove excess workers
+            for i in range(new_count, old_count):
+                worker_id = f"worker_{i}"
+                if worker_id in self.worker_stats:
+                    del self.worker_stats[worker_id]
+        
+        # Shutdown old executor gracefully
+        try:
+            old_executor.shutdown(wait=True, timeout=30)
+        except Exception as e:
+            logger.warning("Error shutting down old executor: %s", str(e))
+    
+    def shutdown(self, wait: bool = True, timeout: Optional[float] = None) -> None:
+        """Shutdown the concurrent executor."""
+        logger.info("Shutting down concurrent executor...")
+        
+        # Stop auto-scaling
+        self.stop_auto_scaling_monitor()
+        
+        # Shutdown thread pool
+        try:
+            self.executor.shutdown(wait=wait, timeout=timeout)
+            logger.info("Concurrent executor shutdown complete")
+        except Exception as e:
+            logger.error("Error during executor shutdown: %s", str(e))
+
+
+# Global concurrent executor instance
+concurrent_executor = ConcurrentExecutor()
+
+
+def get_concurrent_executor() -> ConcurrentExecutor:
+    """Get global concurrent executor instance."""
+    return concurrent_executor
+
+
+# Decorator for concurrent execution
+def concurrent_task(timeout: Optional[float] = None):
+    """Decorator to execute function concurrently."""
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            # Submit task to concurrent executor
+            task_id = concurrent_executor.submit_task(func, *args, **kwargs)
+            
+            # For now, we'll execute synchronously and return the result
+            # In a real async environment, this would return a Future
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator

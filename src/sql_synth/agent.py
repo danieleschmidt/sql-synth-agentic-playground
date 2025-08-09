@@ -21,6 +21,14 @@ from .security import security_auditor
 from .metrics import QueryMetrics
 from .cache import cache_generation_result, cache_query_result, cache_manager
 from .concurrent import concurrent_task
+from .error_handling import (
+    global_error_manager, error_context, retry_with_backoff,
+    ErrorRecoveryManager, RetryStrategy, SQLGenerationError, SQLExecutionError
+)
+from .advanced_validation import global_validator, ValidationSeverity
+from .performance_optimizer import (
+    global_profiler, global_query_optimizer, optimize_operation
+)
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +109,11 @@ class SQLSynthesisAgent:
             logger.exception("Failed to create SQL agent")
             raise RuntimeError(f"SQL agent creation failed: {e}") from e
 
+    @optimize_operation("sql_generation")
+    @retry_with_backoff(
+        retry_strategy=RetryStrategy(max_attempts=3, initial_delay=1.0),
+        recovery_manager=global_error_manager
+    )
     @cache_generation_result(ttl=3600)
     @concurrent_task(timeout=30)
     def generate_sql(self, natural_language_query: str) -> dict[str, Any]:
@@ -119,47 +132,127 @@ class SQLSynthesisAgent:
         start_time = time.time()
         
         try:
-            # Input validation
-            self._validate_input(natural_language_query)
-            
-            # Generate SQL using LangChain agent
-            result = self._generate_with_retry(natural_language_query)
-            
-            # Extract SQL from agent response
-            sql_query = self._extract_sql_from_result(result)
-            
-            # Security validation
-            is_safe, violations = self.security_validator.audit_generated_query(sql_query)
-            if not is_safe:
-                violation_reasons = [str(v) for v in violations]
-                raise ValueError(f"Security validation failed: {'; '.join(violation_reasons)}")
-            
-            # Additional validations
-            self._validate_generated_sql(sql_query)
-            
-            generation_time = time.time() - start_time
-            
-            # Record metrics
-            self.metrics.record_generation(
-                success=True,
-                generation_time=generation_time,
-                query_length=len(sql_query),
-            )
-            
-            return {
-                "sql_query": sql_query,
-                "success": True,
-                "generation_time": generation_time,
-                "security_validated": True,
-                "metadata": {
-                    "model_used": self.model_name,
-                    "original_query": natural_language_query,
-                    "query_length": len(sql_query),
-                    "dialect": self.database_manager.db_type,
-                    "timestamp": time.time(),
-                },
-                "agent_output": result,
-            }
+            with error_context(
+                "sql_generation",
+                global_error_manager,
+                {"query_length": len(natural_language_query), "model": self.model_name}
+            ):
+                # Advanced input validation
+                validation_result = global_validator.validate_natural_language(natural_language_query)
+                if not validation_result.is_valid:
+                    error_issues = [issue for issue in validation_result.issues 
+                                  if issue.severity in [ValidationSeverity.CRITICAL, ValidationSeverity.ERROR]]
+                    error_messages = [issue.message for issue in error_issues]
+                    raise ValueError(f"Input validation failed: {'; '.join(error_messages)}")
+                
+                # Log validation warnings
+                warning_issues = [issue for issue in validation_result.issues 
+                                if issue.severity == ValidationSeverity.WARNING]
+                if warning_issues:
+                    warning_messages = [issue.message for issue in warning_issues]
+                    logger.warning(f"Input validation warnings: {'; '.join(warning_messages)}")
+                
+                # Basic input validation (legacy)
+                self._validate_input(natural_language_query)
+                
+                # Generate SQL using LangChain agent
+                result = self._generate_with_retry(natural_language_query)
+                
+                # Extract SQL from agent response
+                sql_query = self._extract_sql_from_result(result)
+                
+                # Optimize the generated SQL query
+                optimization_result = global_query_optimizer.optimize_query(
+                    sql_query,
+                    {
+                        "default_limit": 100,
+                        "context": "sql_synthesis",
+                        "natural_query": natural_language_query[:100]
+                    }
+                )
+                
+                if optimization_result["optimizations_applied"]:
+                    logger.info(f"Applied SQL optimizations: {optimization_result['optimizations_applied']}")
+                    sql_query = optimization_result["optimized_query"]
+                
+                # Security validation
+                is_safe, violations = self.security_validator.audit_generated_query(sql_query)
+                if not is_safe:
+                    violation_reasons = [str(v) for v in violations]
+                    raise ValueError(f"Security validation failed: {'; '.join(violation_reasons)}")
+                
+                # Advanced SQL validation
+                schema_info = self.get_schema_info()
+                sql_validation_result = global_validator.validate_sql(sql_query, schema_info)
+                
+                if not sql_validation_result.is_valid:
+                    error_issues = [issue for issue in sql_validation_result.issues 
+                                  if issue.severity in [ValidationSeverity.CRITICAL, ValidationSeverity.ERROR]]
+                    error_messages = [issue.message for issue in error_issues]
+                    raise ValueError(f"SQL validation failed: {'; '.join(error_messages)}")
+                
+                # Log SQL validation warnings
+                warning_issues = [issue for issue in sql_validation_result.issues 
+                                if issue.severity == ValidationSeverity.WARNING]
+                if warning_issues:
+                    warning_messages = [issue.message for issue in warning_issues]
+                    logger.warning(f"SQL validation warnings: {'; '.join(warning_messages)}")
+                
+                # Legacy validation (kept for compatibility)
+                self._validate_generated_sql(sql_query)
+                
+                generation_time = time.time() - start_time
+                
+                # Record metrics
+                self.metrics.record_generation(
+                    success=True,
+                    generation_time=generation_time,
+                    query_length=len(sql_query),
+                )
+                
+                return {
+                    "sql_query": sql_query,
+                    "success": True,
+                    "generation_time": generation_time,
+                    "security_validated": True,
+                    "metadata": {
+                        "model_used": self.model_name,
+                        "original_query": natural_language_query,
+                        "query_length": len(sql_query),
+                        "dialect": self.database_manager.db_type,
+                        "timestamp": time.time(),
+                        "validation_score": sql_validation_result.validation_score,
+                        "query_characteristics": sql_validation_result.metadata.get("characteristics", {}),
+                        "estimated_complexity": sql_validation_result.metadata.get("characteristics", {}).get("estimated_complexity", "unknown"),
+                    },
+                    "validation_results": {
+                        "input_validation": {
+                            "score": validation_result.validation_score,
+                            "issues": [{
+                                "severity": issue.severity.value,
+                                "type": issue.validation_type.value,
+                                "message": issue.message,
+                                "suggestion": issue.suggestion
+                            } for issue in validation_result.issues]
+                        },
+                        "sql_validation": {
+                            "score": sql_validation_result.validation_score,
+                            "issues": [{
+                                "severity": issue.severity.value,
+                                "type": issue.validation_type.value,
+                                "message": issue.message,
+                                "suggestion": issue.suggestion
+                            } for issue in sql_validation_result.issues]
+                        }
+                    },
+                    "optimization_results": {
+                        "optimization_score": optimization_result.get("optimization_score", 0.0),
+                        "optimizations_applied": optimization_result.get("optimizations_applied", []),
+                        "performance_suggestions": optimization_result.get("suggestions", []),
+                        "estimated_performance_gain": optimization_result.get("estimated_performance_gain", 0.0)
+                    },
+                    "agent_output": result,
+                }
             
         except Exception as e:
             generation_time = time.time() - start_time
@@ -185,6 +278,11 @@ class SQLSynthesisAgent:
                 },
             }
 
+    @optimize_operation("sql_execution")
+    @retry_with_backoff(
+        retry_strategy=RetryStrategy(max_attempts=2, initial_delay=0.5),
+        recovery_manager=global_error_manager
+    )
     @cache_query_result(ttl=1800)
     def execute_sql(self, sql_query: str, limit: int = 100) -> dict[str, Any]:
         """Execute SQL query with safety checks.
@@ -203,51 +301,80 @@ class SQLSynthesisAgent:
         start_time = time.time()
         
         try:
-            # Security validation
-            is_safe, violations = self.security_validator.audit_generated_query(sql_query)
-            if not is_safe:
-                violation_reasons = [str(v) for v in violations]
-                raise ValueError(f"Security validation failed: {'; '.join(violation_reasons)}")
-            
-            # Add LIMIT clause if not present and not a metadata query
-            limited_query = self._add_limit_if_needed(sql_query, limit)
-            
-            # Execute query
-            engine = self.database_manager.get_engine()
-            with engine.connect() as connection:
-                result = connection.execute(text(limited_query))
+            with error_context(
+                "sql_execution",
+                global_error_manager,
+                {"query_length": len(sql_query), "limit": limit}
+            ):
+                # Advanced SQL validation before execution
+                schema_info = self.get_schema_info()
+                sql_validation_result = global_validator.validate_sql(sql_query, schema_info)
                 
-                # Fetch results
-                if result.returns_rows:
-                    rows = result.fetchall()
-                    columns = list(result.keys())
+                if not sql_validation_result.is_valid:
+                    error_issues = [issue for issue in sql_validation_result.issues 
+                                  if issue.severity in [ValidationSeverity.CRITICAL, ValidationSeverity.ERROR]]
+                    error_messages = [issue.message for issue in error_issues]
+                    raise ValueError(f"SQL validation failed: {'; '.join(error_messages)}")
+                
+                # Legacy security validation
+                is_safe, violations = self.security_validator.audit_generated_query(sql_query)
+                if not is_safe:
+                    violation_reasons = [str(v) for v in violations]
+                    raise ValueError(f"Security validation failed: {'; '.join(violation_reasons)}")
+                
+                # Add LIMIT clause if not present and not a metadata query
+                limited_query = self._add_limit_if_needed(sql_query, limit)
+                
+                # Execute query
+                engine = self.database_manager.get_engine()
+                with engine.connect() as connection:
+                    result = connection.execute(text(limited_query))
                     
-                    execution_time = time.time() - start_time
-                    
-                    # Record successful execution metrics
-                    self.metrics.record_execution(
-                        success=True,
-                        execution_time=execution_time,
-                        rows_returned=len(rows),
-                    )
-                    
-                    return {
-                        "success": True,
-                        "rows": [dict(zip(columns, row)) for row in rows],
-                        "columns": columns,
-                        "row_count": len(rows),
-                        "execution_time": execution_time,
-                        "query_executed": limited_query,
-                    }
-                else:
-                    # Non-SELECT query (shouldn't happen with current restrictions)
-                    execution_time = time.time() - start_time
-                    return {
-                        "success": True,
-                        "message": "Query executed successfully (no results returned)",
-                        "execution_time": execution_time,
-                        "query_executed": limited_query,
-                    }
+                    # Fetch results
+                    if result.returns_rows:
+                        rows = result.fetchall()
+                        columns = list(result.keys())
+                        
+                        execution_time = time.time() - start_time
+                        
+                        # Record successful execution metrics
+                        self.metrics.record_execution(
+                            success=True,
+                            execution_time=execution_time,
+                            rows_returned=len(rows),
+                        )
+                        
+                        return {
+                            "success": True,
+                            "rows": [dict(zip(columns, row)) for row in rows],
+                            "columns": columns,
+                            "row_count": len(rows),
+                            "execution_time": execution_time,
+                            "query_executed": limited_query,
+                            "validation_metadata": {
+                                "validation_score": sql_validation_result.validation_score,
+                                "query_characteristics": sql_validation_result.metadata.get("characteristics", {}),
+                                "estimated_result_size": sql_validation_result.metadata.get("estimated_rows", "unknown")
+                            },
+                            "performance_metadata": {
+                                "optimization_score": optimization_result.get("optimization_score", 0.0),
+                                "optimizations_applied": optimization_result.get("optimizations_applied", []),
+                                "performance_suggestions": optimization_result.get("suggestions", [])
+                            }
+                        }
+                    else:
+                        # Non-SELECT query (shouldn't happen with current restrictions)
+                        execution_time = time.time() - start_time
+                        return {
+                            "success": True,
+                            "message": "Query executed successfully (no results returned)",
+                            "execution_time": execution_time,
+                            "query_executed": limited_query,
+                            "validation_metadata": {
+                                "validation_score": sql_validation_result.validation_score,
+                                "query_characteristics": sql_validation_result.metadata.get("characteristics", {})
+                            }
+                        }
                     
         except Exception as e:
             execution_time = time.time() - start_time
@@ -285,12 +412,85 @@ class SQLSynthesisAgent:
             return {"error": str(e)}
 
     def get_metrics(self) -> dict[str, Any]:
-        """Get agent performance metrics.
+        """Get comprehensive agent performance metrics including error statistics.
 
         Returns:
-            Dictionary containing performance metrics
+            Dictionary containing performance metrics and error statistics
         """
-        return self.metrics.get_summary()
+        base_metrics = self.metrics.get_summary()
+        error_stats = global_error_manager.get_error_statistics()
+        performance_stats = global_profiler.get_performance_summary()
+        resource_stats = global_profiler.get_resource_summary()
+        optimization_stats = global_query_optimizer.get_cache_stats()
+        
+        return {
+            **base_metrics,
+            "error_statistics": error_stats,
+            "performance_statistics": performance_stats,
+            "resource_utilization": resource_stats,
+            "optimization_statistics": optimization_stats,
+            "reliability_score": self._calculate_reliability_score(base_metrics, error_stats),
+            "performance_score": self._calculate_performance_score(performance_stats, resource_stats)
+        }
+    
+    def _calculate_reliability_score(self, metrics: Dict[str, Any], error_stats: Dict[str, Any]) -> float:
+        """Calculate overall reliability score.
+        
+        Args:
+            metrics: Performance metrics
+            error_stats: Error statistics
+            
+        Returns:
+            Reliability score between 0.0 and 1.0
+        """
+        total_operations = metrics.get('total_generations', 0) + metrics.get('total_executions', 0)
+        if total_operations == 0:
+            return 1.0
+        
+        total_errors = error_stats.get('total_errors', 0)
+        error_rate = total_errors / total_operations
+        
+        # Base reliability from success rates
+        gen_success_rate = metrics.get('generation_success_rate', 1.0)
+        exec_success_rate = metrics.get('execution_success_rate', 1.0)
+        base_reliability = (gen_success_rate + exec_success_rate) / 2
+        
+        # Penalize for recent errors
+        recent_errors = error_stats.get('recent_errors_1h', 0)
+        recent_penalty = min(recent_errors * 0.05, 0.3)  # Max 30% penalty
+        
+        reliability_score = max(0.0, base_reliability - recent_penalty)
+        return reliability_score
+    
+    def _calculate_performance_score(self, perf_stats: Dict[str, Any], resource_stats: Dict[str, Any]) -> float:
+        """Calculate overall performance score.
+        
+        Args:
+            perf_stats: Performance statistics
+            resource_stats: Resource utilization statistics
+            
+        Returns:
+            Performance score between 0.0 and 1.0
+        """
+        if perf_stats.get("message") or resource_stats.get("message"):
+            return 0.5  # Default score when no data available
+        
+        # Base performance score from operation timings
+        avg_duration = perf_stats.get("duration_stats", {}).get("avg", 5.0)
+        duration_score = max(0.0, 1.0 - (avg_duration / 10.0))  # Penalize if > 10s avg
+        
+        # Resource efficiency score
+        avg_cpu = resource_stats.get("avg_cpu_percent", 50) / 100.0
+        avg_memory = resource_stats.get("avg_memory_percent", 50) / 100.0
+        resource_score = max(0.0, 1.0 - max(avg_cpu, avg_memory))
+        
+        # Success rate contribution
+        success_rate = perf_stats.get("success_rate", 0.9)
+        
+        # Weighted combination
+        performance_score = (duration_score * 0.4 + resource_score * 0.3 + success_rate * 0.3)
+        
+        return min(1.0, performance_score)
 
     def _validate_input(self, query: str) -> None:
         """Validate natural language input.
@@ -338,6 +538,21 @@ class SQLSynthesisAgent:
                 logger.warning("Attempt %d failed: %s", attempt, str(e))
                 if attempt < self.max_retries:
                     time.sleep(1)  # Brief delay before retry
+        
+        # Enhanced error reporting with context
+        error_context_dict = {
+            "operation": "sql_generation",
+            "attempts": self.max_retries,
+            "query_preview": query[:100],
+            "model": self.model_name
+        }
+        
+        if last_error:
+            global_error_manager.handle_error(
+                last_error, 
+                "sql_generation_final_failure", 
+                error_context_dict
+            )
         
         raise RuntimeError(f"SQL generation failed after {self.max_retries} attempts: {last_error}")
 
@@ -410,7 +625,13 @@ class SQLSynthesisAgent:
         allowed_start = any(sql_upper.startswith(op) for op in self.SUPPORTED_OPERATIONS)
         if not allowed_start:
             operations_str = ", ".join(self.SUPPORTED_OPERATIONS)
-            raise ValueError(f"Query must start with one of: {operations_str}")
+            error_msg = f"Query must start with one of: {operations_str}. Got: {sql_upper[:50]}..."
+            global_error_manager.handle_error(
+                ValueError(error_msg),
+                "sql_validation",
+                {"query_start": sql_upper[:50], "allowed_operations": list(self.SUPPORTED_OPERATIONS)}
+            )
+            raise ValueError(error_msg)
         
         # Check for dangerous operations
         dangerous_keywords = [
@@ -419,7 +640,13 @@ class SQLSynthesisAgent:
         ]
         for keyword in dangerous_keywords:
             if keyword in sql_upper:
-                raise ValueError(f"Dangerous operation not allowed: {keyword}")
+                error_msg = f"Dangerous operation not allowed: {keyword}"
+                global_error_manager.handle_error(
+                    ValueError(error_msg),
+                    "dangerous_sql_operation",
+                    {"dangerous_keyword": keyword, "query_preview": sql_query[:100]}
+                )
+                raise ValueError(error_msg)
 
     def _add_limit_if_needed(self, sql_query: str, limit: int) -> str:
         """Add LIMIT clause to query if not present.
