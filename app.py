@@ -195,46 +195,127 @@ def main() -> None:
                     generated_sql = simulate_sql_generation(user_query)
                     ui.show_info("⚠️ Demo mode: SQL generated using simple rules")
                 else:
-                    # Real mode: would integrate with LangChain agent here
-                    generated_sql = simulate_sql_generation(user_query)  # Placeholder
-                    ui.show_info("🔧 SQL Agent integration coming in next phase")
+                    # Real mode: Use actual SQL synthesis agent
+                    from src.sql_synth.agent import AgentFactory
+                    try:
+                        agent = AgentFactory.create_agent(st.session_state.db_manager)
+                        result = agent.generate_sql(user_query)
+                        if result["success"]:
+                            generated_sql = result["sql_query"]
+                            ui.show_success(f"SQL generated in {result['generation_time']:.2f}s")
+                        else:
+                            ui.show_error(f"SQL generation failed: {result['error']}")
+                            generated_sql = None
+                    except Exception as e:
+                        logger.exception("Agent creation failed")
+                        ui.show_error(f"Agent initialization failed: {e}")
+                        generated_sql = simulate_sql_generation(user_query)
 
-                # Display generated SQL
-                ui.render_sql_output(generated_sql)
+                # Display generated SQL with metadata
+                metadata = result.get('metadata', {}) if not demo_mode and isinstance(result, dict) else {}
+                ui.render_sql_output(generated_sql, metadata)
 
                 # Execute query and show results
-                with st.spinner("Executing query..."):
-                    if demo_mode:
-                        # Demo mode: create fake results
-                        results = create_demo_results(generated_sql)
-                        ui.show_success("Demo results generated successfully!")
-                    else:
-                        # Real mode: would execute against database
-                        results = create_demo_results(generated_sql)  # Placeholder
-                        ui.show_success("Query executed successfully!")
+                if generated_sql:
+                    with st.spinner("Executing query..."):
+                        if demo_mode:
+                            # Demo mode: create fake results
+                            results = create_demo_results(generated_sql)
+                            ui.show_success("Demo results generated successfully!")
+                        else:
+                            # Real mode: execute against database using agent
+                            try:
+                                from src.sql_synth.agent import AgentFactory
+                                agent = AgentFactory.create_agent(st.session_state.db_manager)
+                                exec_result = agent.execute_sql(generated_sql)
+                                if exec_result["success"]:
+                                    if "rows" in exec_result:
+                                        results = pd.DataFrame(exec_result["rows"])
+                                        ui.show_success(f"Query executed successfully! ({exec_result['row_count']} rows in {exec_result['execution_time']:.2f}s)")
+                                    else:
+                                        results = pd.DataFrame({"message": [exec_result.get("message", "Query executed successfully")]})
+                                        ui.show_success("Query executed successfully!")
+                                else:
+                                    ui.show_error(f"Query execution failed: {exec_result['error']}")
+                                    results = None
+                            except Exception as e:
+                                logger.exception("Query execution failed")
+                                ui.show_error(f"Execution failed: {e}")
+                                results = None
+                else:
+                    results = None
 
-                    # Display results
-                    ui.render_results(results)
+                    # Display results with execution metadata
+                    execution_metadata = exec_result if not demo_mode and 'exec_result' in locals() else {}
+                    ui.render_results(results, execution_metadata)
+                    
+                    # Update session state with metrics and performance data
+                    if not demo_mode and 'agent' in locals():
+                        st.session_state.agent_metrics = agent.get_metrics()
+                        st.session_state.last_query_complexity = ui._estimate_complexity(generated_sql)
+                        
+                        # Update performance stats
+                        if not hasattr(st.session_state, 'performance_stats'):
+                            st.session_state.performance_stats = {
+                                'total_queries': 0,
+                                'total_gen_time': 0,
+                                'total_exec_time': 0,
+                                'cache_hits': 0
+                            }
+                        
+                        stats = st.session_state.performance_stats
+                        stats['total_queries'] += 1
+                        if 'result' in locals() and isinstance(result, dict):
+                            stats['total_gen_time'] += result.get('generation_time', 0)
+                        if 'exec_result' in locals() and isinstance(exec_result, dict):
+                            stats['total_exec_time'] += exec_result.get('execution_time', 0)
+                        
+                        # Calculate averages
+                        stats['avg_gen_time'] = stats['total_gen_time'] / stats['total_queries']
+                        stats['avg_exec_time'] = stats['total_exec_time'] / stats['total_queries']
+                        stats['cache_hit_rate'] = stats['cache_hits'] / stats['total_queries']
 
-                    # Add to query history
-                    st.session_state.query_history.append({
+                    # Add to enhanced query history
+                    history_entry = {
                         "user_query": user_query,
                         "generated_sql": generated_sql,
                         "timestamp": pd.Timestamp.now(),
-                    })
+                        "success": True,
+                        "row_count": len(results) if results is not None else 0,
+                        "complexity": getattr(st.session_state, 'last_query_complexity', 'Unknown'),
+                        "generation_time": result.get('generation_time', 0) if not demo_mode and isinstance(result, dict) else 0,
+                        "execution_time": exec_result.get('execution_time', 0) if not demo_mode and 'exec_result' in locals() and isinstance(exec_result, dict) else 0
+                    }
+                    st.session_state.query_history.append(history_entry)
 
         except Exception as e:
             logger.exception("Error processing query")
             ui.show_error(f"Failed to process query: {e}")
 
-    # Show query history in sidebar
+    # Show enhanced query history in sidebar
     if st.session_state.query_history:
         st.sidebar.markdown("---")
-        st.sidebar.subheader("📝 Query History")
+        st.sidebar.subheader("📝 Recent Queries")
+        
+        # Summary metrics
+        total_queries = len(st.session_state.query_history)
+        successful_queries = sum(1 for entry in st.session_state.query_history if entry.get('success', True))
+        avg_gen_time = sum(entry.get('generation_time', 0) for entry in st.session_state.query_history) / total_queries
+        
+        st.sidebar.metric("Total Queries", total_queries)
+        st.sidebar.metric("Success Rate", f"{successful_queries/total_queries:.1%}")
+        st.sidebar.metric("Avg Gen Time", f"{avg_gen_time:.2f}s")
+        
+        # Recent queries
         for i, entry in enumerate(reversed(st.session_state.query_history[-5:])):
             query_num = len(st.session_state.query_history) - i
-            with st.sidebar.expander(f"Query {query_num}"):
+            complexity = entry.get('complexity', 'Unknown')
+            success_icon = "✅" if entry.get('success', True) else "❌"
+            
+            with st.sidebar.expander(f"{success_icon} Query {query_num} ({complexity})"):
                 st.sidebar.write(f"**Input:** {entry['user_query'][:50]}...")
+                st.sidebar.write(f"**Rows:** {entry.get('row_count', 0)}")
+                st.sidebar.write(f"**Time:** {entry.get('generation_time', 0):.2f}s gen + {entry.get('execution_time', 0):.2f}s exec")
                 
                 # Truncate long SQL queries
                 MAX_SQL_DISPLAY = 100

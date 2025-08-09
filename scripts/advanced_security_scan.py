@@ -150,7 +150,7 @@ class SecurityScanner:
                 for i, line in enumerate(lines, 1):
                     # Check for string formatting in SQL
                     if any(pattern in line for pattern in [
-                        ".format(", "f\"", "f'", "%s" % ", "% (", "+ "
+                        ".format(", "f\"", "f'", "\"%s\" % ", "% (", "+ "
                     ]) and any(sql_keyword in line.upper() for sql_keyword in [
                         "SELECT", "INSERT", "UPDATE", "DELETE", "DROP", "CREATE"
                     ]):
