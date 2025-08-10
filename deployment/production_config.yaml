@@ -1,0 +1,344 @@
+# Production Configuration for SQL Synthesis Agent
+# This file contains production-grade configuration for deploying
+# the SQL synthesis system in enterprise environments
+
+# Application Configuration
+application:
+  name: "sql-synth-agentic-playground"
+  version: "1.0.0"
+  environment: "production"
+  debug: false
+  log_level: "INFO"
+  
+  # Performance settings
+  max_workers: 8
+  worker_timeout: 30
+  request_timeout: 120
+  max_request_size: "10MB"
+  
+  # Rate limiting
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 100
+    burst_capacity: 150
+    
+# Database Configuration
+database:
+  # Connection pooling
+  pool_size: 20
+  max_overflow: 30
+  pool_timeout: 30
+  pool_recycle: 3600
+  pool_pre_ping: true
+  
+  # Connection retry
+  max_retries: 3
+  retry_delay: 2
+  
+  # Supported databases
+  supported_types:
+    - postgresql
+    - mysql
+    - snowflake
+    - sqlite
+
+# Security Configuration
+security:
+  # Authentication
+  auth:
+    enabled: true
+    token_expiry: 3600  # 1 hour
+    refresh_token_expiry: 86400  # 24 hours
+    
+  # Authorization
+  rbac:
+    enabled: true
+    default_role: "viewer"
+    
+  # Encryption
+  encryption:
+    algorithm: "AES-256-GCM"
+    key_rotation_days: 90
+    
+  # SQL Injection Protection
+  sql_protection:
+    ml_detection: true
+    pattern_detection: true
+    risk_threshold: 0.7
+    
+  # Audit Logging
+  audit:
+    enabled: true
+    retention_days: 2555  # 7 years
+    include_query_results: false
+    compliance_frameworks:
+      - gdpr
+      - ccpa
+      - sox
+
+# Caching Configuration
+caching:
+  # Cache backend
+  backend: "redis"  # redis, memcached, memory
+  
+  # Redis configuration
+  redis:
+    host: "${REDIS_HOST:localhost}"
+    port: "${REDIS_PORT:6379}"
+    password: "${REDIS_PASSWORD:}"
+    db: 0
+    max_connections: 50
+    
+  # Cache settings
+  default_ttl: 3600  # 1 hour
+  max_cache_size: "1GB"
+  compression: true
+  
+  # Cache invalidation
+  invalidation:
+    enabled: true
+    patterns:
+      - "tenant:*:query:*"
+
+# Multi-tenancy Configuration
+tenancy:
+  enabled: true
+  isolation_level: "namespace"  # namespace, database, schema
+  
+  # Tenant tiers
+  tiers:
+    free:
+      max_queries_per_hour: 100
+      max_concurrent_queries: 2
+      cache_ttl: 1800
+      query_timeout: 15
+      
+    basic:
+      max_queries_per_hour: 1000
+      max_concurrent_queries: 5
+      cache_ttl: 3600
+      query_timeout: 30
+      
+    professional:
+      max_queries_per_hour: 10000
+      max_concurrent_queries: 20
+      cache_ttl: 7200
+      query_timeout: 60
+      
+    enterprise:
+      max_queries_per_hour: 100000
+      max_concurrent_queries: 100
+      cache_ttl: 14400
+      query_timeout: 120
+
+# Monitoring Configuration
+monitoring:
+  # Metrics collection
+  metrics:
+    enabled: true
+    endpoint: "/metrics"
+    port: 9090
+    
+  # Health checks
+  health_checks:
+    enabled: true
+    endpoint: "/health"
+    interval: 30
+    timeout: 10
+    
+  # Logging
+  logging:
+    format: "json"
+    structured: true
+    correlation_id: true
+    
+  # Alerting
+  alerting:
+    enabled: true
+    channels:
+      - slack
+      - email
+      - pagerduty
+    
+    thresholds:
+      error_rate: 0.05  # 5%
+      response_time_p95: 5.0  # 5 seconds
+      cpu_usage: 0.8  # 80%
+      memory_usage: 0.85  # 85%
+      disk_usage: 0.9  # 90%
+
+# Performance Optimization
+performance:
+  # Query optimization
+  optimization:
+    enabled: true
+    analyze_execution_plans: true
+    suggest_indexes: true
+    cache_plans: true
+    
+  # Connection pooling per tenant
+  tenant_pools:
+    enabled: true
+    min_pool_size: 2
+    max_pool_size: 10
+    
+  # Distributed processing
+  distributed:
+    enabled: true
+    max_workers: 8
+    use_processes: false
+    
+  # Memory management
+  memory:
+    max_heap_size: "4GB"
+    gc_threshold: 0.8
+
+# AI/ML Configuration
+ai_models:
+  # Primary model
+  primary:
+    provider: "openai"
+    model: "gpt-4"
+    temperature: 0.0
+    max_tokens: 2000
+    timeout: 30
+    
+  # Fallback models
+  fallback:
+    - provider: "openai"
+      model: "gpt-3.5-turbo"
+      temperature: 0.1
+      
+  # A/B Testing
+  ab_testing:
+    enabled: true
+    experiments:
+      - id: "model_comparison_v1"
+        variants:
+          control: 0.7
+          gpt4_optimized: 0.3
+        
+  # Model switching
+  switching:
+    enabled: true
+    criteria:
+      - complexity_threshold: 0.7
+      - response_time_limit: 10.0
+
+# Data Privacy and Compliance
+privacy:
+  # PII Detection
+  pii_detection:
+    enabled: true
+    anonymize_logs: true
+    mask_sensitive_data: true
+    
+  # GDPR Compliance
+  gdpr:
+    enabled: true
+    data_retention_days: 1095  # 3 years
+    consent_tracking: true
+    right_to_erasure: true
+    
+  # Data encryption
+  encryption:
+    at_rest: true
+    in_transit: true
+    key_management: "vault"
+
+# Infrastructure Configuration
+infrastructure:
+  # Kubernetes deployment
+  kubernetes:
+    namespace: "sql-synth-prod"
+    replicas: 3
+    
+    resources:
+      requests:
+        cpu: "1000m"
+        memory: "2Gi"
+      limits:
+        cpu: "2000m"
+        memory: "4Gi"
+        
+    # Horizontal Pod Autoscaler
+    hpa:
+      enabled: true
+      min_replicas: 3
+      max_replicas: 20
+      target_cpu: 70
+      target_memory: 80
+      
+    # Pod Disruption Budget
+    pdb:
+      enabled: true
+      min_available: 2
+      
+  # Load balancing
+  load_balancer:
+    type: "nginx"
+    session_affinity: true
+    health_check_path: "/health"
+    
+  # Service mesh
+  service_mesh:
+    enabled: true
+    provider: "istio"
+    mtls: true
+
+# Backup and Disaster Recovery
+backup:
+  # Database backups
+  database:
+    enabled: true
+    frequency: "daily"
+    retention: "30d"
+    encryption: true
+    
+  # Configuration backups
+  config:
+    enabled: true
+    frequency: "daily"
+    retention: "90d"
+    
+  # Disaster recovery
+  disaster_recovery:
+    enabled: true
+    rto: 60  # Recovery Time Objective in minutes
+    rpo: 15  # Recovery Point Objective in minutes
+    cross_region: true
+
+# Feature Flags
+features:
+  advanced_analytics: true
+  query_optimization: true
+  real_time_monitoring: true
+  a_b_testing: true
+  multi_tenant: true
+  distributed_processing: true
+  ml_security: true
+  compliance_reporting: true
+  auto_scaling: true
+  circuit_breaker: true
+
+# Environment Variables
+environment_variables:
+  # Database
+  DATABASE_URL: "${DATABASE_URL}"
+  DB_TYPE: "${DB_TYPE}"
+  
+  # Security
+  OPENAI_API_KEY: "${OPENAI_API_KEY}"
+  JWT_SECRET: "${JWT_SECRET}"
+  ENCRYPTION_KEY: "${ENCRYPTION_KEY}"
+  
+  # Cache
+  REDIS_URL: "${REDIS_URL}"
+  
+  # Monitoring
+  SENTRY_DSN: "${SENTRY_DSN}"
+  DATADOG_API_KEY: "${DATADOG_API_KEY}"
+  
+  # Third-party integrations
+  SLACK_WEBHOOK_URL: "${SLACK_WEBHOOK_URL}"
+  PAGERDUTY_API_KEY: "${PAGERDUTY_API_KEY}"

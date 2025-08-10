@@ -3,7 +3,7 @@ import time
 from typing import Dict, Any
 
 from src.sql_synth.database import DatabaseManager
-from src.sql_synth.streamlit_ui import SQLSynthesizer
+from src.sql_synth.agent import AgentFactory
 
 
 class TestEndToEndIntegration:
@@ -14,7 +14,7 @@ class TestEndToEndIntegration:
         """Test complete workflow from natural language to SQL execution."""
         # Initialize components
         db_manager = DatabaseManager(memory_db)
-        synthesizer = SQLSynthesizer()
+        agent = AgentFactory.create_agent(db_manager)
         
         # Create test schema
         with db_manager.get_connection() as conn:

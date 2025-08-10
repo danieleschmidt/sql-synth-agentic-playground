@@ -6,7 +6,7 @@ import time
 from typing import List, Dict, Any
 import pytest
 import requests
-from src.sql_synth.streamlit_ui import main as streamlit_main
+from src.sql_synth.agent import AgentFactory
 
 
 class LoadTestConfig:

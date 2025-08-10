@@ -4,14 +4,14 @@ This module provides comprehensive metrics collection, analysis, and reporting
 for monitoring agent performance, query quality, and system health.
 """
 
-import time
 import logging
-from typing import Dict, List, Any, Optional
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from collections import defaultdict, deque
 import statistics
 import threading
+import time
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
 
 
 @dataclass
@@ -49,94 +49,93 @@ class PerformanceStats:
 
 class MetricsCollector:
     """Thread-safe metrics collection system."""
-    
+
     def __init__(self, max_metrics: int = 10000):
         self.max_metrics = max_metrics
         self.metrics: deque = deque(maxlen=max_metrics)
         self.lock = threading.RLock()
         self.logger = logging.getLogger(__name__)
-        
+
         # Performance counters
         self.counters = defaultdict(int)
         self.timers = defaultdict(list)
-        
+
         # Alert thresholds
         self.alert_thresholds = {
-            'max_generation_time': 30.0,  # seconds
-            'max_execution_time': 10.0,   # seconds
-            'min_success_rate': 0.95,     # 95%
-            'max_error_rate': 0.05,       # 5%
+            "max_generation_time": 30.0,  # seconds
+            "max_execution_time": 10.0,   # seconds
+            "min_success_rate": 0.95,     # 95%
+            "max_error_rate": 0.05,       # 5%
         }
-    
+
     def record_query_metric(self, metric: QueryMetric) -> None:
         """Record a query performance metric."""
         with self.lock:
             self.metrics.append(metric)
-            
+
             # Update counters
-            self.counters['total_queries'] += 1
+            self.counters["total_queries"] += 1
             if metric.success:
-                self.counters['successful_queries'] += 1
+                self.counters["successful_queries"] += 1
             else:
-                self.counters['failed_queries'] += 1
+                self.counters["failed_queries"] += 1
                 if metric.error:
                     error_type = self._categorize_error(metric.error)
-                    self.counters[f'error_{error_type}'] += 1
-            
+                    self.counters[f"error_{error_type}"] += 1
+
             # Update timers
-            self.timers['generation_times'].append(metric.generation_time)
+            self.timers["generation_times"].append(metric.generation_time)
             if metric.execution_time is not None:
-                self.timers['execution_times'].append(metric.execution_time)
-            
+                self.timers["execution_times"].append(metric.execution_time)
+
             # Check for alerts
             self._check_alerts(metric)
-    
+
     def _categorize_error(self, error: str) -> str:
         """Categorize error types for tracking."""
         error_lower = error.lower()
-        
-        if 'timeout' in error_lower:
-            return 'timeout'
-        elif 'connection' in error_lower:
-            return 'connection'
-        elif 'syntax' in error_lower or 'parsing' in error_lower:
-            return 'syntax'
-        elif 'permission' in error_lower or 'unauthorized' in error_lower:
-            return 'permission'
-        elif 'security' in error_lower or 'injection' in error_lower:
-            return 'security'
-        else:
-            return 'other'
-    
+
+        if "timeout" in error_lower:
+            return "timeout"
+        if "connection" in error_lower:
+            return "connection"
+        if "syntax" in error_lower or "parsing" in error_lower:
+            return "syntax"
+        if "permission" in error_lower or "unauthorized" in error_lower:
+            return "permission"
+        if "security" in error_lower or "injection" in error_lower:
+            return "security"
+        return "other"
+
     def _check_alerts(self, metric: QueryMetric) -> None:
         """Check if metric triggers any alerts."""
         alerts = []
-        
+
         # Check generation time
-        if metric.generation_time > self.alert_thresholds['max_generation_time']:
+        if metric.generation_time > self.alert_thresholds["max_generation_time"]:
             alerts.append(f"High generation time: {metric.generation_time:.2f}s")
-        
+
         # Check execution time
-        if (metric.execution_time is not None and 
-            metric.execution_time > self.alert_thresholds['max_execution_time']):
+        if (metric.execution_time is not None and
+            metric.execution_time > self.alert_thresholds["max_execution_time"]):
             alerts.append(f"High execution time: {metric.execution_time:.2f}s")
-        
+
         # Check recent success rate
         recent_metrics = self._get_recent_metrics(timedelta(minutes=5))
         if len(recent_metrics) >= 10:  # Only check if we have enough data
             success_rate = sum(1 for m in recent_metrics if m.success) / len(recent_metrics)
-            if success_rate < self.alert_thresholds['min_success_rate']:
+            if success_rate < self.alert_thresholds["min_success_rate"]:
                 alerts.append(f"Low success rate: {success_rate:.2%}")
-        
+
         # Log alerts
         for alert in alerts:
             self.logger.warning(f"Performance alert: {alert}")
-    
+
     def _get_recent_metrics(self, time_window: timedelta) -> List[QueryMetric]:
         """Get metrics within a time window."""
         cutoff_time = datetime.now() - time_window
         return [m for m in self.metrics if m.timestamp >= cutoff_time]
-    
+
     def get_performance_stats(self, time_window: Optional[timedelta] = None) -> PerformanceStats:
         """Get comprehensive performance statistics."""
         with self.lock:
@@ -144,49 +143,49 @@ class MetricsCollector:
                 metrics = self._get_recent_metrics(time_window)
             else:
                 metrics = list(self.metrics)
-            
+
             if not metrics:
                 return PerformanceStats()
-            
+
             successful_metrics = [m for m in metrics if m.success]
             failed_metrics = [m for m in metrics if not m.success]
-            
+
             # Basic counts
             total_queries = len(metrics)
             successful_queries = len(successful_metrics)
             failed_queries = len(failed_metrics)
             success_rate = successful_queries / total_queries if total_queries > 0 else 0.0
-            
+
             # Generation time stats
             generation_times = [m.generation_time for m in metrics]
             avg_generation_time = statistics.mean(generation_times) if generation_times else 0.0
             p95_generation_time = self._percentile(generation_times, 95) if generation_times else 0.0
             min_generation_time = min(generation_times) if generation_times else 0.0
             max_generation_time = max(generation_times) if generation_times else 0.0
-            
+
             # Execution time stats
             execution_times = [m.execution_time for m in metrics if m.execution_time is not None]
             avg_execution_time = statistics.mean(execution_times) if execution_times else 0.0
             p95_execution_time = self._percentile(execution_times, 95) if execution_times else 0.0
-            
+
             # Query characteristics
             query_lengths = [m.query_length for m in metrics if m.query_length is not None]
             avg_query_length = statistics.mean(query_lengths) if query_lengths else 0.0
-            
+
             rows_returned = [m.rows_returned for m in metrics if m.rows_returned is not None]
             avg_rows_returned = statistics.mean(rows_returned) if rows_returned else 0.0
-            
+
             # Last 24h queries
             last_24h_metrics = self._get_recent_metrics(timedelta(hours=24))
             last_24h_queries = len(last_24h_metrics)
-            
+
             # Error analysis
             error_types = defaultdict(int)
             for metric in failed_metrics:
                 if metric.error:
                     error_category = self._categorize_error(metric.error)
                     error_types[error_category] += 1
-            
+
             return PerformanceStats(
                 total_queries=total_queries,
                 successful_queries=successful_queries,
@@ -203,7 +202,7 @@ class MetricsCollector:
                 last_24h_queries=last_24h_queries,
                 error_types=dict(error_types),
             )
-    
+
     def _percentile(self, data: List[float], percentile: int) -> float:
         """Calculate percentile of a dataset."""
         if not data:
@@ -211,35 +210,35 @@ class MetricsCollector:
         sorted_data = sorted(data)
         index = int((percentile / 100.0) * len(sorted_data))
         return sorted_data[min(index, len(sorted_data) - 1)]
-    
+
     def get_health_status(self) -> Dict[str, Any]:
         """Get overall system health status."""
         recent_stats = self.get_performance_stats(timedelta(minutes=15))
-        
+
         # Determine health status
         health_score = 100
         issues = []
-        
+
         # Check success rate
         if recent_stats.success_rate < 0.9:
             health_score -= 30
             issues.append(f"Low success rate: {recent_stats.success_rate:.1%}")
-        
+
         # Check response times
         if recent_stats.avg_generation_time > 15:
             health_score -= 20
             issues.append(f"High generation time: {recent_stats.avg_generation_time:.1f}s")
-        
+
         if recent_stats.avg_execution_time > 5:
             health_score -= 15
             issues.append(f"High execution time: {recent_stats.avg_execution_time:.1f}s")
-        
+
         # Check error rate
         error_rate = recent_stats.failed_queries / max(recent_stats.total_queries, 1)
         if error_rate > 0.1:
             health_score -= 25
             issues.append(f"High error rate: {error_rate:.1%}")
-        
+
         # Determine status
         if health_score >= 90:
             status = "healthy"
@@ -247,7 +246,7 @@ class MetricsCollector:
             status = "degraded"
         else:
             status = "unhealthy"
-        
+
         return {
             "status": status,
             "health_score": max(health_score, 0),
@@ -259,11 +258,11 @@ class MetricsCollector:
 
 class QueryMetrics:
     """Simplified metrics interface for agent usage."""
-    
+
     def __init__(self):
         self.collector = MetricsCollector()
         self.logger = logging.getLogger(__name__)
-    
+
     def record_generation(
         self,
         success: bool,
@@ -282,7 +281,7 @@ class QueryMetrics:
             model_used=model_used,
         )
         self.collector.record_query_metric(metric)
-    
+
     def record_execution(
         self,
         success: bool,
@@ -302,12 +301,12 @@ class QueryMetrics:
                     last_metric.error = error
                 if rows_returned is not None:
                     last_metric.rows_returned = rows_returned
-    
+
     def get_summary(self) -> Dict[str, Any]:
         """Get metrics summary."""
         stats = self.collector.get_performance_stats()
         health = self.collector.get_health_status()
-        
+
         return {
             "performance": {
                 "total_queries": stats.total_queries,
@@ -320,7 +319,7 @@ class QueryMetrics:
             "errors": stats.error_types,
             "thresholds": self.collector.alert_thresholds,
         }
-    
+
     def reset_metrics(self) -> None:
         """Reset all metrics (for testing/development)."""
         with self.collector.lock:
@@ -338,7 +337,7 @@ def monitor_performance(operation_name: str):
             start_time = time.time()
             success = True
             error = None
-            
+
             try:
                 result = func(*args, **kwargs)
                 return result
@@ -348,7 +347,7 @@ def monitor_performance(operation_name: str):
                 raise
             finally:
                 execution_time = time.time() - start_time
-                
+
                 # Log performance metric
                 logger = logging.getLogger(__name__)
                 logger.info(
@@ -359,9 +358,9 @@ def monitor_performance(operation_name: str):
                         "execution_time": execution_time,
                         "success": success,
                         "error": error,
-                    }
+                    },
                 )
-        
+
         return wrapper
     return decorator
 
