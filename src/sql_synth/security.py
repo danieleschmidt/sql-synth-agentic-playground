@@ -1,16 +1,42 @@
 """
 Security utilities and validation for SQL synthesis.
+Enhanced with AI-powered security analysis and real-time threat mitigation.
 """
 
 import hashlib
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from enum import Enum
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import sqlparse
-from sqlparse import tokens
+from sqlparse import sql, tokens
+
+
+class ThreatLevel(Enum):
+    """Security threat severity levels."""
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
+@dataclass
+class ThreatIntelligence:
+    """Threat intelligence data structure."""
+    threat_id: str
+    threat_type: str
+    severity: ThreatLevel
+    description: str
+    indicators: List[str]
+    mitigation_strategies: List[str]
+    first_detected: datetime
+    last_seen: datetime
+    occurrence_count: int = 1
+    geographic_data: Dict[str, Any] = field(default_factory=dict)
+    attribution: Optional[str] = None
 
 
 @dataclass
