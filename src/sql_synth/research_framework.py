@@ -2,6 +2,7 @@
 
 This module implements advanced research capabilities including algorithm comparison,
 performance benchmarking, statistical validation, and automated research insights.
+Enhanced with autonomous discovery and intelligent optimization.
 """
 
 import json
@@ -12,11 +13,146 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
+import numpy as np
 from scipy import stats
 
 logger = logging.getLogger(__name__)
+
+
+class IntelligentDiscovery:
+    """Autonomous research opportunity discovery system."""
+    
+    def __init__(self):
+        self.discovery_patterns = {
+            'performance_bottlenecks': self._identify_performance_patterns,
+            'accuracy_improvements': self._identify_accuracy_patterns,
+            'novel_algorithms': self._identify_algorithmic_patterns,
+            'optimization_opportunities': self._identify_optimization_patterns
+        }
+        
+    def discover_research_opportunities(self, metrics_history: List[Dict]) -> List[Dict]:
+        """Automatically discover research opportunities from metrics."""
+        opportunities = []
+        
+        for pattern_name, detector in self.discovery_patterns.items():
+            try:
+                found_opportunities = detector(metrics_history)
+                for opp in found_opportunities:
+                    opp['discovery_method'] = pattern_name
+                    opp['confidence'] = self._calculate_confidence(opp, metrics_history)
+                opportunities.extend(found_opportunities)
+            except Exception as e:
+                logger.warning(f"Discovery pattern {pattern_name} failed: {e}")
+                
+        return sorted(opportunities, key=lambda x: x.get('confidence', 0), reverse=True)
+    
+    def _identify_performance_patterns(self, metrics: List[Dict]) -> List[Dict]:
+        """Identify performance optimization opportunities."""
+        opportunities = []
+        
+        # Analyze response time trends
+        response_times = [m.get('response_time', 0) for m in metrics[-50:]]
+        if len(response_times) >= 10:
+            trend_slope = self._calculate_trend(response_times)
+            if trend_slope > 0.1:  # Degrading performance
+                opportunities.append({
+                    'type': 'performance_degradation',
+                    'description': 'Response time degradation detected',
+                    'potential_impact': 'High',
+                    'recommended_action': 'Implement adaptive caching and query optimization'
+                })
+        
+        # Analyze memory usage patterns
+        memory_usage = [m.get('memory_usage', 0) for m in metrics[-30:]]
+        if memory_usage and max(memory_usage) > 0.8:  # >80% memory usage
+            opportunities.append({
+                'type': 'memory_optimization',
+                'description': 'High memory usage detected',
+                'potential_impact': 'Medium',
+                'recommended_action': 'Implement memory pooling and garbage collection optimization'
+            })
+            
+        return opportunities
+    
+    def _identify_accuracy_patterns(self, metrics: List[Dict]) -> List[Dict]:
+        """Identify accuracy improvement opportunities.""" 
+        opportunities = []
+        
+        accuracy_scores = [m.get('accuracy_score', 0) for m in metrics[-100:]]
+        if len(accuracy_scores) >= 20:
+            avg_accuracy = statistics.mean(accuracy_scores)
+            if avg_accuracy < 0.9:  # <90% accuracy
+                opportunities.append({
+                    'type': 'accuracy_improvement',
+                    'description': f'Average accuracy {avg_accuracy:.2%} below target',
+                    'potential_impact': 'High',
+                    'recommended_action': 'Implement ensemble methods and advanced prompt engineering'
+                })
+                
+        return opportunities
+    
+    def _identify_algorithmic_patterns(self, metrics: List[Dict]) -> List[Dict]:
+        """Identify novel algorithm opportunities."""
+        opportunities = []
+        
+        # Look for complex query patterns that could benefit from new approaches
+        query_complexities = [m.get('query_complexity', 'simple') for m in metrics[-50:]]
+        complex_ratio = sum(1 for c in query_complexities if c == 'complex') / len(query_complexities)
+        
+        if complex_ratio > 0.3:  # >30% complex queries
+            opportunities.append({
+                'type': 'algorithm_enhancement',
+                'description': 'High complex query ratio suggests need for specialized algorithms',
+                'potential_impact': 'High', 
+                'recommended_action': 'Research graph-based query planning and neural SQL synthesis'
+            })
+            
+        return opportunities
+    
+    def _identify_optimization_patterns(self, metrics: List[Dict]) -> List[Dict]:
+        """Identify general optimization opportunities."""
+        opportunities = []
+        
+        # Cache hit rate analysis
+        cache_hits = [m.get('cache_hit_rate', 0) for m in metrics[-50:]]
+        if cache_hits and statistics.mean(cache_hits) < 0.7:  # <70% cache hit rate
+            opportunities.append({
+                'type': 'caching_optimization',
+                'description': 'Low cache hit rate detected',
+                'potential_impact': 'Medium',
+                'recommended_action': 'Implement intelligent cache warming and predictive prefetching'
+            })
+            
+        return opportunities
+    
+    def _calculate_trend(self, values: List[float]) -> float:
+        """Calculate linear trend slope."""
+        if len(values) < 2:
+            return 0
+        x = list(range(len(values)))
+        slope, _, _, _, _ = stats.linregress(x, values)
+        return slope
+    
+    def _calculate_confidence(self, opportunity: Dict, metrics: List[Dict]) -> float:
+        """Calculate confidence score for discovered opportunity."""
+        base_confidence = 0.5
+        
+        # Adjust based on data quality
+        if len(metrics) >= 100:
+            base_confidence += 0.2
+        elif len(metrics) >= 50:
+            base_confidence += 0.1
+            
+        # Adjust based on impact
+        impact = opportunity.get('potential_impact', 'Low')
+        if impact == 'High':
+            base_confidence += 0.2
+        elif impact == 'Medium':
+            base_confidence += 0.1
+            
+        return min(base_confidence, 1.0)
 
 
 class ResearchPhase(Enum):
