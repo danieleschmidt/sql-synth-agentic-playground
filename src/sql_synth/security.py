@@ -107,6 +107,9 @@ class SQLInjectionDetector:
             "exec", "execute", "sp_", "xp_", "cmdshell", "openrowset", "opendatasource",
         }
 
+        # Security violation history
+        self.violations_history = []
+
     def analyze_query(self, query: str) -> List[SecurityViolation]:
         """Analyze a query for potential injection attempts."""
         violations = []
@@ -177,6 +180,194 @@ class SQLInjectionDetector:
                     ))
 
         return violations
+
+    def detect_injection(self, query: str) -> bool:
+        """Simple boolean check for SQL injection (for test compatibility)."""
+        if query is None or query == "":
+            return False
+            
+        violations = self.analyze_query(query)
+        return len(violations) > 0
+
+    def analyze_query_structure(self, query: str) -> Dict[str, Any]:
+        """Analyze SQL query structure (for test compatibility)."""
+        if not query:
+            return {
+                "has_multiple_statements": False,
+                "has_comments": False,
+                "suspicious_keywords": [],
+            }
+
+        try:
+            parsed = sqlparse.parse(query)
+            if not parsed:
+                return {
+                    "has_multiple_statements": False,
+                    "has_comments": False,
+                    "suspicious_keywords": [],
+                }
+
+            statement = parsed[0]
+            
+            # Check for multiple statements
+            has_multiple = len([token for token in statement.flatten()
+                              if token.ttype is tokens.Keyword and 
+                              token.value.upper() in ("SELECT", "INSERT", "UPDATE", "DELETE")]) > 1
+
+            # Check for comments
+            has_comments = any(token.ttype in (tokens.Comment.Single, tokens.Comment.Multiline)
+                             for token in statement.flatten())
+
+            # Check for suspicious keywords
+            suspicious = []
+            query_lower = query.lower()
+            for keyword in self.dangerous_keywords:
+                if keyword in query_lower:
+                    suspicious.append(keyword)
+
+            return {
+                "has_multiple_statements": has_multiple,
+                "has_comments": has_comments,
+                "suspicious_keywords": suspicious,
+            }
+
+        except Exception as e:
+            self.logger.warning(f"Failed to analyze SQL structure: {e}")
+            return {
+                "has_multiple_statements": False,
+                "has_comments": False,
+                "suspicious_keywords": [],
+            }
+
+    def validate_parameterized_query(self, query: str, parameters: List[Any] = None) -> bool:
+        """Validate that a query uses parameterized statements safely."""
+        if not query:
+            return False
+            
+        # Check for string formatting in query (unsafe)
+        unsafe_patterns = [r'%s', r'%d', r'\{.*\}', r'format\(']
+        for pattern in unsafe_patterns:
+            if re.search(pattern, query, re.IGNORECASE):
+                return False
+        
+        # Check for proper parameterization (looking for ? or named parameters)
+        param_patterns = [r'\?', r':[a-zA-Z_][a-zA-Z0-9_]*', r'\$[0-9]+']
+        has_params = any(re.search(pattern, query) for pattern in param_patterns)
+        
+        return has_params or parameters is not None
+
+    def sanitize_input(self, user_input: str) -> str:
+        """Sanitize user input for safe processing."""
+        if not user_input:
+            return ""
+            
+        # Remove null bytes
+        sanitized = user_input.replace('\x00', '')
+        
+        # Escape single quotes
+        sanitized = sanitized.replace("'", "''")
+        
+        # Remove or escape dangerous characters
+        sanitized = re.sub(r'[;\\]', '', sanitized)
+        
+        return sanitized
+
+    def get_security_violations(self) -> List[SecurityViolation]:
+        """Get history of security violations."""
+        return self.violations_history.copy()
+
+    def reset_violations_history(self) -> None:
+        """Reset the violations history."""
+        self.violations_history.clear()
+
+    def assess_risk_level(self, query: str) -> str:
+        """Assess the risk level of a query."""
+        violations = self.analyze_query(query)
+        
+        if not violations:
+            return "LOW"
+            
+        # Check severity levels
+        high_severity = any(v.severity == "high" for v in violations)
+        if high_severity:
+            return "HIGH"
+            
+        medium_severity = any(v.severity == "medium" for v in violations)
+        if medium_severity:
+            return "MEDIUM"
+            
+        return "LOW"
+
+    def generate_security_report(self) -> Dict[str, Any]:
+        """Generate a comprehensive security report."""
+        violations = self.get_security_violations()
+        
+        violation_types = {}
+        for violation in violations:
+            violation_types[violation.violation_type] = violation_types.get(violation.violation_type, 0) + 1
+            
+        return {
+            "total_violations": len(violations),
+            "violation_types": violation_types,
+            "last_scan": datetime.now().isoformat(),
+            "risk_summary": {
+                "high_risk": len([v for v in violations if v.severity == "high"]),
+                "medium_risk": len([v for v in violations if v.severity == "medium"]),
+                "low_risk": len([v for v in violations if v.severity == "low"]),
+            }
+        }
+
+    def is_sql_comment_injection(self, query: str) -> bool:
+        """Check if query contains SQL comment injection patterns."""
+        comment_patterns = [r'--', r'/\*.*\*/', r'#']
+        return any(re.search(pattern, query, re.IGNORECASE) for pattern in comment_patterns)
+
+    def is_union_injection(self, query: str) -> bool:
+        """Check if query contains UNION injection patterns."""
+        union_pattern = r'\bunion\b.*\bselect\b'
+        return bool(re.search(union_pattern, query, re.IGNORECASE))
+
+    def is_boolean_injection(self, query: str) -> bool:
+        """Check if query contains boolean injection patterns."""
+        boolean_patterns = [
+            r"'\s*or\s+'.*'\s*=\s*'",
+            r"'\s*or\s+1\s*=\s*1",
+            r"'\s*and\s+'.*'\s*=\s*'",
+        ]
+        return any(re.search(pattern, query, re.IGNORECASE) for pattern in boolean_patterns)
+
+    def extract_sql_keywords(self, query: str) -> List[str]:
+        """Extract SQL keywords from a query."""
+        if not query:
+            return []
+            
+        sql_keywords = [
+            "SELECT", "FROM", "WHERE", "INSERT", "UPDATE", "DELETE", "DROP",
+            "CREATE", "ALTER", "TABLE", "INDEX", "VIEW", "UNION", "JOIN",
+            "ORDER", "GROUP", "HAVING", "LIMIT", "OFFSET"
+        ]
+        
+        found_keywords = []
+        query_upper = query.upper()
+        
+        for keyword in sql_keywords:
+            if re.search(r'\b' + keyword + r'\b', query_upper):
+                found_keywords.append(keyword)
+                
+        return found_keywords
+
+    def log_security_event(self, event_type: str, description: str, severity: str = "medium") -> None:
+        """Log a security event."""
+        violation = SecurityViolation(
+            violation_type=event_type,
+            severity=severity,
+            description=description,
+            location="security_monitor",
+            timestamp=datetime.now()
+        )
+        
+        self.violations_history.append(violation)
+        self.logger.warning(f"Security event: {event_type} - {description}")
 
 
 class InputValidator:
