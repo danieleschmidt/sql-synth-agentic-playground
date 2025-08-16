@@ -13,6 +13,8 @@ import streamlit as st
 
 from src.sql_synth.database import DatabaseManager, get_database_manager
 from src.sql_synth.logging_config import get_logger, setup_logging
+from src.sql_synth.advanced_cache import get_cached_generation_result, cache_generation_result, get_cache_statistics
+from src.sql_synth.monitoring import record_metric, get_monitoring_dashboard
 from src.sql_synth.streamlit_ui import (
     StreamlitUI,
     configure_page,
@@ -236,18 +238,39 @@ def main() -> None:
             with st.spinner("Generating SQL..."):
                 generation_start = time.time()
                 
-                if demo_mode:
-                    # Demo mode: simulate SQL generation
-                    generated_sql = simulate_sql_generation(user_query)
+                # Check cache first
+                cached_result = get_cached_generation_result(processed_query)
+                if cached_result:
+                    generated_sql = cached_result["sql_query"]
+                    metadata = cached_result.get("metadata", {})
                     generation_time = time.time() - generation_start
                     
                     logger.log_query_generation(
-                        user_query=user_query,
+                        user_query=processed_query,
+                        generated_sql=generated_sql,
+                        success=True,
+                        generation_time=generation_time,
+                        mode="cache_hit"
+                    )
+                    
+                    ui.show_success(f"🚀 SQL retrieved from cache in {generation_time:.3f}s")
+                    record_metric("query.cache_hits", 1)
+                    
+                elif demo_mode:
+                    # Demo mode: simulate SQL generation
+                    generated_sql = simulate_sql_generation(processed_query)
+                    generation_time = time.time() - generation_start
+                    
+                    logger.log_query_generation(
+                        user_query=processed_query,
                         generated_sql=generated_sql,
                         success=True,
                         generation_time=generation_time,
                         mode="demo"
                     )
+                    
+                    # Cache demo results
+                    cache_generation_result(processed_query, generated_sql, {"mode": "demo"})
                     
                     ui.show_info("⚠️ Demo mode: SQL generated using simple rules")
                 else:
@@ -266,9 +289,13 @@ def main() -> None:
                         
                         if result["success"]:
                             generated_sql = result["sql_query"]
+                            metadata = result.get("metadata", {})
+                            
+                            # Cache the successful result
+                            cache_generation_result(processed_query, generated_sql, metadata)
                             
                             logger.log_query_generation(
-                                user_query=user_query,
+                                user_query=processed_query,
                                 generated_sql=generated_sql,
                                 success=True,
                                 generation_time=generation_time,
@@ -277,6 +304,8 @@ def main() -> None:
                                 tokens=result.get("token_count")
                             )
                             
+                            record_metric("query.generation_time", generation_time)
+                            record_metric("query.cache_misses", 1)
                             ui.show_success(f"SQL generated in {generation_time:.2f}s")
                         else:
                             logger.log_query_generation(
@@ -429,6 +458,50 @@ def main() -> None:
                     else entry["generated_sql"]
                 )
                 st.sidebar.code(sql_display, language="sql")
+
+    # Performance Dashboard
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("⚡ Performance Dashboard")
+    
+    try:
+        # Get cache statistics
+        cache_stats = get_cache_statistics()
+        query_cache_stats = cache_stats.get("query_cache", {})
+        
+        # Display cache metrics
+        hit_rate = query_cache_stats.get("hit_rate", 0)
+        st.sidebar.metric("Cache Hit Rate", f"{hit_rate:.1%}")
+        
+        entry_count = query_cache_stats.get("entry_count", 0)
+        st.sidebar.metric("Cached Queries", entry_count)
+        
+        # Get monitoring dashboard data
+        monitoring_data = get_monitoring_dashboard()
+        system_status = monitoring_data.get("system_status", "unknown")
+        
+        status_color = {
+            "healthy": "🟢",
+            "warning": "🟡", 
+            "error": "🟠",
+            "critical": "🔴"
+        }.get(system_status, "⚫")
+        
+        st.sidebar.metric("System Status", f"{status_color} {system_status.title()}")
+        
+        # Show active alerts if any
+        active_alerts = monitoring_data.get("active_alerts", [])
+        if active_alerts:
+            st.sidebar.warning(f"⚠️ {len(active_alerts)} Active Alert(s)")
+            
+        # Performance metrics button
+        if st.sidebar.button("📊 Detailed Metrics"):
+            st.sidebar.json({
+                "cache_stats": cache_stats,
+                "monitoring": monitoring_data
+            })
+    
+    except Exception as e:
+        st.sidebar.error(f"Performance data unavailable: {e}")
 
 
 if __name__ == "__main__":
