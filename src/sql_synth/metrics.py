@@ -320,6 +320,19 @@ class QueryMetrics:
             "thresholds": self.collector.alert_thresholds,
         }
 
+    def get_summary_metrics(self) -> Dict[str, Any]:
+        """Get summary metrics (alternative format for compatibility)."""
+        stats = self.collector.get_performance_stats()
+        
+        return {
+            "total_queries": stats.total_queries,
+            "successful_queries": stats.successful_queries,
+            "failed_queries": stats.failed_queries,
+            "average_response_time": stats.avg_generation_time,
+            "cache_hits": 0,  # Placeholder - implement cache metrics if needed
+            "cache_misses": 0,  # Placeholder - implement cache metrics if needed
+        }
+
     def reset_metrics(self) -> None:
         """Reset all metrics (for testing/development)."""
         with self.collector.lock:

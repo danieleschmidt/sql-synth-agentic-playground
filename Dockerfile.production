@@ -1,89 +1,69 @@
-# Production Dockerfile for SQL Synthesis Agentic Playground
-# Multi-stage build for optimized production image
+# Production Dockerfile for SQL Synthesis Agent
+FROM python:3.12-slim as builder
 
-# Stage 1: Build stage
-FROM python:3.11-slim as builder
-
-# Set build arguments
-ARG BUILD_DATE
-ARG VCS_REF
-ARG VERSION
-
-# Add labels for metadata
-LABEL org.opencontainers.image.title="SQL Synthesis Agentic Playground" \
-      org.opencontainers.image.description="Production-grade natural language to SQL translation system" \
-      org.opencontainers.image.version=$VERSION \
-      org.opencontainers.image.created=$BUILD_DATE \
-      org.opencontainers.image.revision=$VCS_REF \
-      org.opencontainers.image.vendor="Terragon Labs" \
-      org.opencontainers.image.source="https://github.com/danieleschmidt/sql-synth-agentic-playground"
-
-# Install system dependencies needed for building
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
-    git \
     && rm -rf /var/lib/apt/lists/*
 
-# Set work directory
-WORKDIR /app
-
-# Install Python dependencies
-COPY requirements.txt .
-COPY pyproject.toml .
-
-# Install dependencies in virtual environment for better isolation
+# Create virtual environment
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Upgrade pip and install dependencies
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir -r requirements.txt
+# Copy requirements and install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
 
-# Stage 2: Runtime stage
-FROM python:3.11-slim as runtime
+# Production image
+FROM python:3.12-slim
 
-# Install runtime system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
     curl \
-    ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+    && groupadd -r appuser \
+    && useradd -r -g appuser appuser
 
-# Create non-root user for security
-RUN groupadd -r sqlsynth && useradd -r -g sqlsynth sqlsynth
-
-# Set work directory
-WORKDIR /app
-
-# Copy virtual environment from builder stage
+# Copy virtual environment from builder
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
+# Set working directory
+WORKDIR /app
+
 # Copy application code
-COPY --chown=sqlsynth:sqlsynth . .
+COPY src/ src/
+COPY app.py .
+COPY .streamlit/ .streamlit/
 
 # Create necessary directories
-RUN mkdir -p /app/logs /app/cache /app/data && \
-    chown -R sqlsynth:sqlsynth /app
+RUN mkdir -p /app/logs /app/data /app/cache \
+    && chown -R appuser:appuser /app
+
+# Create health check script
+RUN echo '#!/usr/bin/env python3\nimport requests\nimport sys\n\ntry:\n    response = requests.get("http://localhost:8501/health", timeout=10)\n    if response.status_code == 200:\n        sys.exit(0)\n    else:\n        sys.exit(1)\nexcept Exception:\n    sys.exit(1)' > /app/healthcheck.py \
+    && chmod +x /app/healthcheck.py
 
 # Switch to non-root user
-USER sqlsynth
+USER appuser
 
-# Expose ports
-EXPOSE 8501 9090
+# Environment variables
+ENV PYTHONPATH=/app
+ENV STREAMLIT_SERVER_PORT=8501
+ENV STREAMLIT_SERVER_ADDRESS=0.0.0.0
+ENV STREAMLIT_SERVER_HEADLESS=true
+ENV STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+ENV STREAMLIT_SERVER_ENABLE_CORS=false
+ENV STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION=true
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8501/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD python /app/healthcheck.py
 
-# Set environment variables
-ENV PYTHONPATH=/app \
-    PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    STREAMLIT_SERVER_PORT=8501 \
-    STREAMLIT_SERVER_ADDRESS=0.0.0.0 \
-    STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+# Expose port
+EXPOSE 8501
 
-# Default command
+# Run application
 CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]

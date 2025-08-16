@@ -5,12 +5,16 @@ an interactive interface for converting natural language to SQL.
 """
 
 import logging
+import uuid
 from typing import Optional
 
 import pandas as pd
 import streamlit as st
 
 from src.sql_synth.database import DatabaseManager, get_database_manager
+from src.sql_synth.logging_config import get_logger, setup_logging
+from src.sql_synth.advanced_cache import get_cached_generation_result, cache_generation_result, get_cache_statistics
+from src.sql_synth.monitoring import record_metric, get_monitoring_dashboard
 from src.sql_synth.streamlit_ui import (
     StreamlitUI,
     configure_page,
@@ -18,12 +22,19 @@ from src.sql_synth.streamlit_ui import (
     render_sidebar_info,
 )
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+# Initialize enhanced logging
+setup_logging(
+    level="INFO",
+    enable_json=False,  # Use readable format for development
+    enable_security_log=True,
+    enable_performance_log=True,
 )
-logger = logging.getLogger(__name__)
+
+logger = get_logger(__name__)
+
+# Set up correlation ID for request tracing
+if "correlation_id" not in st.session_state:
+    st.session_state.correlation_id = str(uuid.uuid4())[:8]
 
 
 def initialize_session_state() -> None:
@@ -188,28 +199,150 @@ def main() -> None:
 
     # Process query when submitted
     if submit_clicked and user_query.strip():
+        import time
+        start_time = time.time()
+        
+        # Log query initiation
+        logger.log_query_generation(
+            user_query=user_query,
+            generated_sql=None,
+            success=False,
+            generation_time=0,
+            operation="query_initiated"
+        )
+        
         try:
+            # Comprehensive input validation and security check
+            from src.sql_synth.input_validation import validate_user_input
+            
+            validation_result = validate_user_input(user_query)
+            
+            if not validation_result.is_valid:
+                logger.log_security_event(
+                    event_type="input_validation_failed",
+                    severity=validation_result.risk_level,
+                    description=f"Input validation failed: {', '.join(validation_result.violations)}",
+                    user_input=user_query,
+                    confidence=validation_result.confidence
+                )
+                
+                if validation_result.risk_level in ["high", "critical"]:
+                    ui.show_error("⚠️ Input contains potentially malicious content and has been blocked for security reasons.")
+                    return
+                else:
+                    ui.show_warning(f"⚠️ Input validation issues detected: {', '.join(validation_result.violations)}")
+            
+            # Use sanitized input for processing
+            processed_query = validation_result.sanitized_input
+            
             with st.spinner("Generating SQL..."):
-                if demo_mode:
+                generation_start = time.time()
+                
+                # Check cache first
+                cached_result = get_cached_generation_result(processed_query)
+                if cached_result:
+                    generated_sql = cached_result["sql_query"]
+                    metadata = cached_result.get("metadata", {})
+                    generation_time = time.time() - generation_start
+                    
+                    logger.log_query_generation(
+                        user_query=processed_query,
+                        generated_sql=generated_sql,
+                        success=True,
+                        generation_time=generation_time,
+                        mode="cache_hit"
+                    )
+                    
+                    ui.show_success(f"🚀 SQL retrieved from cache in {generation_time:.3f}s")
+                    record_metric("query.cache_hits", 1)
+                    
+                elif demo_mode:
                     # Demo mode: simulate SQL generation
-                    generated_sql = simulate_sql_generation(user_query)
+                    generated_sql = simulate_sql_generation(processed_query)
+                    generation_time = time.time() - generation_start
+                    
+                    logger.log_query_generation(
+                        user_query=processed_query,
+                        generated_sql=generated_sql,
+                        success=True,
+                        generation_time=generation_time,
+                        mode="demo"
+                    )
+                    
+                    # Cache demo results
+                    cache_generation_result(processed_query, generated_sql, {"mode": "demo"})
+                    
                     ui.show_info("⚠️ Demo mode: SQL generated using simple rules")
                 else:
                     # Real mode: Use actual SQL synthesis agent
                     from src.sql_synth.agent import AgentFactory
+                    from src.sql_synth.error_handling import error_context, ErrorCategory, ErrorSeverity
+                    
                     try:
-                        agent = AgentFactory.create_agent(st.session_state.db_manager)
-                        result = agent.generate_sql(user_query)
+                        with error_context("agent_creation", ErrorCategory.SQL_GENERATION, ErrorSeverity.HIGH):
+                            agent = AgentFactory.create_agent(st.session_state.db_manager)
+                            
+                        with error_context("sql_generation", ErrorCategory.SQL_GENERATION, ErrorSeverity.MEDIUM):
+                            result = agent.generate_sql(user_query)
+                            
+                        generation_time = time.time() - generation_start
+                        
                         if result["success"]:
                             generated_sql = result["sql_query"]
-                            ui.show_success(f"SQL generated in {result['generation_time']:.2f}s")
+                            metadata = result.get("metadata", {})
+                            
+                            # Cache the successful result
+                            cache_generation_result(processed_query, generated_sql, metadata)
+                            
+                            logger.log_query_generation(
+                                user_query=processed_query,
+                                generated_sql=generated_sql,
+                                success=True,
+                                generation_time=generation_time,
+                                mode="agent",
+                                model=result.get("model_used"),
+                                tokens=result.get("token_count")
+                            )
+                            
+                            record_metric("query.generation_time", generation_time)
+                            record_metric("query.cache_misses", 1)
+                            ui.show_success(f"SQL generated in {generation_time:.2f}s")
                         else:
+                            logger.log_query_generation(
+                                user_query=user_query,
+                                generated_sql=None,
+                                success=False,
+                                generation_time=generation_time,
+                                error=result["error"]
+                            )
+                            
                             ui.show_error(f"SQL generation failed: {result['error']}")
                             generated_sql = None
+                            
                     except Exception as e:
-                        logger.exception("Agent creation failed")
+                        generation_time = time.time() - generation_start
+                        
+                        logger.log_error(
+                            error=e,
+                            context={
+                                "operation": "agent_creation_or_generation",
+                                "user_query": user_query[:100],
+                                "generation_time": generation_time
+                            }
+                        )
+                        
                         ui.show_error(f"Agent initialization failed: {e}")
+                        
+                        # Fallback to demo mode for graceful degradation
                         generated_sql = simulate_sql_generation(user_query)
+                        logger.log_query_generation(
+                            user_query=user_query,
+                            generated_sql=generated_sql,
+                            success=True,
+                            generation_time=generation_time,
+                            mode="fallback_demo",
+                            error=str(e)
+                        )
 
                 # Display generated SQL with metadata
                 metadata = result.get('metadata', {}) if not demo_mode and isinstance(result, dict) else {}
@@ -325,6 +458,50 @@ def main() -> None:
                     else entry["generated_sql"]
                 )
                 st.sidebar.code(sql_display, language="sql")
+
+    # Performance Dashboard
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("⚡ Performance Dashboard")
+    
+    try:
+        # Get cache statistics
+        cache_stats = get_cache_statistics()
+        query_cache_stats = cache_stats.get("query_cache", {})
+        
+        # Display cache metrics
+        hit_rate = query_cache_stats.get("hit_rate", 0)
+        st.sidebar.metric("Cache Hit Rate", f"{hit_rate:.1%}")
+        
+        entry_count = query_cache_stats.get("entry_count", 0)
+        st.sidebar.metric("Cached Queries", entry_count)
+        
+        # Get monitoring dashboard data
+        monitoring_data = get_monitoring_dashboard()
+        system_status = monitoring_data.get("system_status", "unknown")
+        
+        status_color = {
+            "healthy": "🟢",
+            "warning": "🟡", 
+            "error": "🟠",
+            "critical": "🔴"
+        }.get(system_status, "⚫")
+        
+        st.sidebar.metric("System Status", f"{status_color} {system_status.title()}")
+        
+        # Show active alerts if any
+        active_alerts = monitoring_data.get("active_alerts", [])
+        if active_alerts:
+            st.sidebar.warning(f"⚠️ {len(active_alerts)} Active Alert(s)")
+            
+        # Performance metrics button
+        if st.sidebar.button("📊 Detailed Metrics"):
+            st.sidebar.json({
+                "cache_stats": cache_stats,
+                "monitoring": monitoring_data
+            })
+    
+    except Exception as e:
+        st.sidebar.error(f"Performance data unavailable: {e}")
 
 
 if __name__ == "__main__":
