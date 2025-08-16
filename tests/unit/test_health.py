@@ -16,7 +16,7 @@ class TestHealthChecker:
 
     def setup_method(self):
         """Set up test fixtures."""
-        with patch('src.sql_synth.health.MetricsCollector'), \
+        with patch('src.sql_synth.health.QueryMetrics'), \
              patch('src.sql_synth.health.DatabaseManager'):
             self.health_checker = HealthChecker()
 
