@@ -30,6 +30,7 @@ from .performance_optimizer import (
     optimize_operation,
 )
 from .security import security_auditor
+from .intelligent_performance_engine import global_performance_engine
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +73,9 @@ class SQLSynthesisAgent:
 
         # Initialize metrics tracker
         self.metrics = QueryMetrics()
+        
+        # Start intelligent performance engine
+        global_performance_engine.start_intelligent_optimization()
 
         # Create LangChain SQL database instance
         try:
@@ -158,7 +162,21 @@ class SQLSynthesisAgent:
                 # Extract SQL from agent response
                 sql_query = self._extract_sql_from_result(result)
 
-                # Optimize the generated SQL query
+                # Apply intelligent performance optimization
+                intelligent_optimization = global_performance_engine.optimize_query_execution(
+                    sql_query,
+                    {
+                        "natural_query": natural_language_query[:100],
+                        "complexity_threshold": 5.0,
+                        "performance_target": 1.0,
+                    }
+                )
+                
+                if intelligent_optimization.get("optimizations_applied"):
+                    logger.info(f"Applied intelligent optimizations: {intelligent_optimization['optimizations_applied']}")
+                    sql_query = intelligent_optimization["optimized_query"]
+
+                # Traditional optimization as fallback
                 optimization_result = global_query_optimizer.optimize_query(
                     sql_query,
                     {
@@ -200,12 +218,22 @@ class SQLSynthesisAgent:
 
                 generation_time = time.time() - start_time
 
-                # Record metrics
+                # Record metrics for traditional system
                 self.metrics.record_generation(
                     success=True,
                     generation_time=generation_time,
                     query_length=len(sql_query),
                 )
+                
+                # Record performance metrics for intelligent engine
+                global_performance_engine.record_performance({
+                    'response_time': generation_time,
+                    'query_complexity': intelligent_optimization.get('complexity_score', 0.0),
+                    'optimization_score': intelligent_optimization.get('optimization_score', 0.0),
+                    'cache_hit_rate': 0.0,  # Will be updated by caching system
+                    'error_rate': 0.0,
+                    'concurrent_requests': 1,
+                })
 
                 return {
                     "sql_query": sql_query,
@@ -247,6 +275,13 @@ class SQLSynthesisAgent:
                         "optimizations_applied": optimization_result.get("optimizations_applied", []),
                         "performance_suggestions": optimization_result.get("suggestions", []),
                         "estimated_performance_gain": optimization_result.get("estimated_performance_gain", 0.0),
+                    },
+                    "intelligent_optimization": {
+                        "strategy": intelligent_optimization.get("execution_strategy", "direct"),
+                        "complexity_score": intelligent_optimization.get("complexity_score", 0.0),
+                        "optimization_score": intelligent_optimization.get("optimization_score", 0.0),
+                        "performance_gain": intelligent_optimization.get("performance_gain", 0.0),
+                        "optimizations_applied": intelligent_optimization.get("optimizations_applied", []),
                     },
                     "agent_output": result,
                 }
@@ -350,9 +385,9 @@ class SQLSynthesisAgent:
                                 "estimated_result_size": sql_validation_result.metadata.get("estimated_rows", "unknown"),
                             },
                             "performance_metadata": {
-                                "optimization_score": optimization_result.get("optimization_score", 0.0),
-                                "optimizations_applied": optimization_result.get("optimizations_applied", []),
-                                "performance_suggestions": optimization_result.get("suggestions", []),
+                                "optimization_score": 0.0,
+                                "optimizations_applied": [],
+                                "performance_suggestions": [],
                             },
                         }
                     # Non-SELECT query (shouldn't happen with current restrictions)
@@ -414,6 +449,10 @@ class SQLSynthesisAgent:
         performance_stats = global_profiler.get_performance_summary()
         resource_stats = global_profiler.get_resource_summary()
         optimization_stats = global_query_optimizer.get_cache_stats()
+        
+        # Get intelligent performance insights
+        intelligent_insights = global_performance_engine.get_performance_insights()
+        scaling_recommendation = global_performance_engine.get_scaling_recommendation()
 
         return {
             **base_metrics,
@@ -423,6 +462,15 @@ class SQLSynthesisAgent:
             "optimization_statistics": optimization_stats,
             "reliability_score": self._calculate_reliability_score(base_metrics, error_stats),
             "performance_score": self._calculate_performance_score(performance_stats, resource_stats),
+            "intelligent_insights": intelligent_insights,
+            "scaling_recommendation": {
+                "action": scaling_recommendation.action,
+                "confidence": scaling_recommendation.confidence,
+                "target_instances": scaling_recommendation.target_instances,
+                "reasoning": scaling_recommendation.reasoning,
+                "cost_impact": scaling_recommendation.cost_impact,
+                "risk_assessment": scaling_recommendation.risk_assessment,
+            },
         }
 
     def _calculate_reliability_score(self, metrics: Dict[str, Any], error_stats: Dict[str, Any]) -> float:
