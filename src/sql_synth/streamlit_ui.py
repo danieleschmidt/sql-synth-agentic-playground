@@ -6,7 +6,7 @@ and interacting with the SQL synthesis agent capabilities.
 
 import logging
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 import pandas as pd
 import plotly.express as px
@@ -34,7 +34,7 @@ class StreamlitUI:
             st.title("🧠 SQL Synthesis Agent")
             st.markdown("""
             **Intelligent Natural Language to SQL Converter**
-            
+
             Transform your questions into precise SQL queries with AI-powered analysis,
             security validation, and performance optimization.
             """)
@@ -109,7 +109,7 @@ class StreamlitUI:
 
         return user_query, submit_clicked
 
-    def render_sql_output(self, sql_query: Optional[str], metadata: Optional[Dict] = None) -> None:
+    def render_sql_output(self, sql_query: Optional[str], metadata: Optional[dict] = None) -> None:
         """Render the generated SQL query with enhanced visualization.
 
         Args:
@@ -159,7 +159,7 @@ class StreamlitUI:
             with tab3:
                 self._render_security_analysis(sql_query)
 
-    def render_results(self, results: Optional[pd.DataFrame], execution_metadata: Optional[Dict] = None) -> None:
+    def render_results(self, results: Optional[pd.DataFrame], execution_metadata: Optional[dict] = None) -> None:
         """Render enhanced query execution results with analytics.
 
         Args:
@@ -232,9 +232,9 @@ class StreamlitUI:
         """
         st.success(message)
 
-    def render_metrics_widget(self, metrics: Dict[str, Any]) -> None:
+    def render_metrics_widget(self, metrics: dict[str, Any]) -> None:
         """Render real-time metrics widget.
-        
+
         Args:
             metrics: Dictionary containing agent performance metrics
         """
@@ -248,10 +248,10 @@ class StreamlitUI:
 
     def _estimate_complexity(self, sql_query: str) -> str:
         """Estimate SQL query complexity.
-        
+
         Args:
             sql_query: SQL query to analyze
-            
+
         Returns:
             Complexity level as string
         """
@@ -278,12 +278,12 @@ class StreamlitUI:
             return "Medium"
         return "Complex"
 
-    def _analyze_query_complexity(self, sql_query: str) -> Dict[str, int]:
+    def _analyze_query_complexity(self, sql_query: str) -> dict[str, int]:
         """Analyze query features for complexity visualization.
-        
+
         Args:
             sql_query: SQL query to analyze
-            
+
         Returns:
             Dictionary of feature counts
         """
@@ -298,7 +298,7 @@ class StreamlitUI:
 
     def _render_security_analysis(self, sql_query: str) -> None:
         """Render security analysis of the SQL query.
-        
+
         Args:
             sql_query: SQL query to analyze
         """
@@ -320,7 +320,7 @@ class StreamlitUI:
 
     def _render_data_insights(self, results: pd.DataFrame) -> None:
         """Render automatic data insights.
-        
+
         Args:
             results: DataFrame to analyze
         """
@@ -354,7 +354,7 @@ class StreamlitUI:
 
     def _render_smart_visualizations(self, results: pd.DataFrame) -> None:
         """Render smart visualizations based on data types.
-        
+
         Args:
             results: DataFrame to visualize
         """
@@ -479,7 +479,7 @@ def render_sidebar_info() -> None:
     - Include sorting preferences ("top 10", "highest first")
     - Specify data relationships ("customers with orders")
     - Use business terms ("revenue", "active users", "conversion rate")
-    
+
     **🔥 Advanced Patterns:**
     - "Compare X vs Y by month"
     - "Show trends for category Z"

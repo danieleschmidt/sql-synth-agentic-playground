@@ -15,7 +15,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Set
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -53,12 +53,12 @@ class AuditEventType(Enum):
 class UserRole:
     """User role definition with permissions."""
     role_name: str
-    permissions: Set[str]
+    permissions: set[str]
     data_access_level: SecurityLevel
-    allowed_databases: Set[str]
-    query_restrictions: Dict[str, Any]
+    allowed_databases: set[str]
+    query_restrictions: dict[str, Any]
     max_rows_per_query: int = 10000
-    allowed_operations: Set[str] = field(default_factory=lambda: {"SELECT"})
+    allowed_operations: set[str] = field(default_factory=lambda: {"SELECT"})
 
 
 @dataclass
@@ -75,9 +75,9 @@ class AuditEvent:
     action_performed: str
     result: str  # success, failure, blocked
     risk_score: float
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     sensitive_data_accessed: bool = False
-    compliance_flags: List[ComplianceFramework] = field(default_factory=list)
+    compliance_flags: list[ComplianceFramework] = field(default_factory=list)
 
 
 class MLSecurityDetector:
@@ -102,7 +102,7 @@ class MLSecurityDetector:
             "time_based_patterns": 3,
         }
 
-    def analyze_query_security(self, query: str, user_context: Dict[str, Any]) -> Dict[str, Any]:
+    def analyze_query_security(self, query: str, user_context: dict[str, Any]) -> dict[str, Any]:
         """Comprehensive security analysis of a query."""
         analysis = {
             "risk_score": 0.0,
@@ -155,7 +155,7 @@ class MLSecurityDetector:
 
         return analysis
 
-    def _analyze_user_behavior(self, user_context: Dict[str, Any]) -> float:
+    def _analyze_user_behavior(self, user_context: dict[str, Any]) -> float:
         """Analyze user behavior patterns for anomalies."""
         risk = 0.0
 
@@ -197,7 +197,7 @@ class DataPrivacyManager:
             r".*profile.*",
         ]
 
-    def analyze_privacy_impact(self, query: str, schema_info: Dict[str, Any]) -> Dict[str, Any]:
+    def analyze_privacy_impact(self, query: str, schema_info: dict[str, Any]) -> dict[str, Any]:
         """Analyze potential privacy impact of a query."""
         analysis = {
             "privacy_score": 0.0,
@@ -244,7 +244,7 @@ class DataPrivacyManager:
         analysis["privacy_score"] = min(analysis["privacy_score"], 1.0)
         return analysis
 
-    def _extract_table_names(self, query: str) -> List[str]:
+    def _extract_table_names(self, query: str) -> list[str]:
         """Extract table names from SQL query."""
         # Simple regex-based extraction (would need proper SQL parser for production)
         from_pattern = r"from\s+([a-zA-Z_][a-zA-Z0-9_]*)"
@@ -261,8 +261,8 @@ class RoleBasedAccessController:
     """Role-based access control system."""
 
     def __init__(self):
-        self.roles: Dict[str, UserRole] = {}
-        self.user_roles: Dict[str, str] = {}  # user_id -> role_name
+        self.roles: dict[str, UserRole] = {}
+        self.user_roles: dict[str, str] = {}  # user_id -> role_name
         self.role_hierarchy = {
             "admin": 4,
             "power_user": 3,
@@ -309,7 +309,7 @@ class RoleBasedAccessController:
         return True
 
     def validate_query_access(self, user_id: str, query: str,
-                            database: str) -> Dict[str, Any]:
+                            database: str) -> dict[str, Any]:
         """Validate user's access to execute a query."""
         validation_result = {
             "allowed": False,
@@ -355,7 +355,7 @@ class RoleBasedAccessController:
         validation_result["allowed"] = True
         return validation_result
 
-    def _extract_operations(self, query: str) -> Set[str]:
+    def _extract_operations(self, query: str) -> set[str]:
         """Extract SQL operations from query."""
         operations = set()
         query_upper = query.upper()
@@ -408,7 +408,7 @@ class AuditLogger:
 
     def __init__(self, storage_backend: str = "local"):
         self.storage_backend = storage_backend
-        self.audit_events: List[AuditEvent] = []
+        self.audit_events: list[AuditEvent] = []
         self.retention_days = 2555  # 7 years for compliance
 
     def log_event(self, event: AuditEvent) -> None:
@@ -433,8 +433,8 @@ class AuditLogger:
         # In production, would send to secure audit storage
         self._persist_event(event)
 
-    def query_audit_log(self, filters: Dict[str, Any],
-                       limit: int = 1000) -> List[AuditEvent]:
+    def query_audit_log(self, filters: dict[str, Any],
+                       limit: int = 1000) -> list[AuditEvent]:
         """Query audit log with filters."""
         filtered_events = self.audit_events.copy()
 
@@ -466,7 +466,7 @@ class AuditLogger:
 
     def generate_compliance_report(self, framework: ComplianceFramework,
                                  start_date: datetime,
-                                 end_date: datetime) -> Dict[str, Any]:
+                                 end_date: datetime) -> dict[str, Any]:
         """Generate compliance report for specific framework."""
         relevant_events = [
             event for event in self.audit_events
@@ -474,7 +474,7 @@ class AuditLogger:
             and framework in event.compliance_flags
         ]
 
-        report = {
+        return {
             "framework": framework.value,
             "report_period": {
                 "start": start_date.isoformat(),
@@ -485,12 +485,11 @@ class AuditLogger:
             "security_violations": len([e for e in relevant_events
                                       if e.event_type == AuditEventType.SECURITY_VIOLATION]),
             "data_access_events": len([e for e in relevant_events if e.sensitive_data_accessed]),
-            "users_involved": len(set(e.user_id for e in relevant_events)),
+            "users_involved": len({e.user_id for e in relevant_events}),
             "event_summary": self._summarize_events_by_type(relevant_events),
             "recommendations": self._generate_compliance_recommendations(framework, relevant_events),
         }
 
-        return report
 
     def _generate_event_id(self, event: AuditEvent) -> str:
         """Generate unique event ID."""
@@ -501,7 +500,7 @@ class AuditLogger:
         """Persist event to secure storage."""
         # In production, would use encrypted storage, SIEM integration, etc.
 
-    def _summarize_events_by_type(self, events: List[AuditEvent]) -> Dict[str, int]:
+    def _summarize_events_by_type(self, events: list[AuditEvent]) -> dict[str, int]:
         """Summarize events by type."""
         summary = {}
         for event in events:
@@ -510,7 +509,7 @@ class AuditLogger:
         return summary
 
     def _generate_compliance_recommendations(self, framework: ComplianceFramework,
-                                           events: List[AuditEvent]) -> List[str]:
+                                           events: list[AuditEvent]) -> list[str]:
         """Generate compliance recommendations."""
         recommendations = []
 
@@ -527,9 +526,9 @@ class AuditLogger:
 
 
 # Default roles for common use cases
-def create_default_roles() -> Dict[str, UserRole]:
+def create_default_roles() -> dict[str, UserRole]:
     """Create default role definitions."""
-    roles = {
+    return {
         "viewer": UserRole(
             role_name="viewer",
             permissions={"query_read"},
@@ -568,7 +567,6 @@ def create_default_roles() -> Dict[str, UserRole]:
         ),
     }
 
-    return roles
 
 
 # Global security components

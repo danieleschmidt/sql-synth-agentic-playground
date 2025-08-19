@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
 from queue import Queue
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,7 @@ class ThreadSafeCounter:
 class LoadBalancer:
     """Simple round-robin load balancer for worker selection."""
 
-    def __init__(self, workers: List[str]):
+    def __init__(self, workers: list[str]):
         self.workers = workers
         self.current_index = 0
         self._lock = threading.Lock()
@@ -110,7 +110,7 @@ class LoadBalancer:
         if worker in self.worker_loads:
             self.worker_loads[worker].decrement()
 
-    def get_load_stats(self) -> Dict[str, int]:
+    def get_load_stats(self) -> dict[str, int]:
         """Get current load for all workers."""
         return {worker: counter.get() for worker, counter in self.worker_loads.items()}
 
@@ -134,8 +134,8 @@ class ConcurrentExecutor:
         self.load_balancer = LoadBalancer(worker_ids)
 
         # Performance tracking
-        self.task_results: List[TaskResult] = []
-        self.worker_stats: Dict[str, WorkerStats] = {
+        self.task_results: list[TaskResult] = []
+        self.worker_stats: dict[str, WorkerStats] = {
             worker_id: WorkerStats(
                 worker_id=worker_id,
                 tasks_completed=0,
@@ -162,15 +162,15 @@ class ConcurrentExecutor:
 
     def submit_task(self, func: Callable, *args, **kwargs) -> str:
         """Submit a task for concurrent execution.
-        
+
         Args:
             func: Function to execute
             *args: Function arguments
             **kwargs: Function keyword arguments
-            
+
         Returns:
             Task ID for tracking
-            
+
         Raises:
             RuntimeError: If queue is full
         """
@@ -181,7 +181,7 @@ class ConcurrentExecutor:
             worker_id = self.load_balancer.get_least_loaded_worker()
 
             # Submit task to thread pool
-            future = self.executor.submit(self._execute_task, task_id, worker_id, func, *args, **kwargs)
+            self.executor.submit(self._execute_task, task_id, worker_id, func, *args, **kwargs)
 
             # Track active task
             self.active_tasks.increment()
@@ -191,8 +191,9 @@ class ConcurrentExecutor:
             return task_id
 
         except Exception as e:
-            logger.error("Failed to submit task: %s", str(e))
-            raise RuntimeError(f"Failed to submit task: {e}") from e
+            logger.exception("Failed to submit task: %s", str(e))
+            msg = f"Failed to submit task: {e}"
+            raise RuntimeError(msg) from e
 
     def _execute_task(self, task_id: str, worker_id: str, func: Callable, *args, **kwargs) -> TaskResult:
         """Execute a task and track performance metrics."""
@@ -245,7 +246,7 @@ class ConcurrentExecutor:
             self._update_worker_stats(worker_id, False, execution_time)
             self.failed_tasks.increment()
 
-            logger.error("Task failed: %s - %s (%.3fs)", task_id, str(e), execution_time)
+            logger.exception("Task failed: %s - %s (%.3fs)", task_id, str(e), execution_time)
 
         finally:
             # Clean up
@@ -275,13 +276,13 @@ class ConcurrentExecutor:
         total_tasks = worker.tasks_completed + worker.tasks_failed
         worker.avg_execution_time = worker.total_execution_time / total_tasks if total_tasks > 0 else 0.0
 
-    def execute_batch(self, tasks: List[Tuple[Callable, tuple, dict]], timeout: Optional[float] = None) -> List[TaskResult]:
+    def execute_batch(self, tasks: list[tuple[Callable, tuple, dict]], timeout: Optional[float] = None) -> list[TaskResult]:
         """Execute multiple tasks concurrently and wait for all to complete.
-        
+
         Args:
             tasks: List of (function, args, kwargs) tuples
             timeout: Maximum time to wait for all tasks
-            
+
         Returns:
             List of TaskResult objects
         """
@@ -289,7 +290,6 @@ class ConcurrentExecutor:
             return []
 
         # Submit all tasks
-        futures = []
         task_ids = []
 
         for func, args, kwargs in tasks:
@@ -310,7 +310,7 @@ class ConcurrentExecutor:
                     result = future.result()
                     results.append(result)
                 except Exception as e:
-                    logger.error("Batch task failed: %s", str(e))
+                    logger.exception("Batch task failed: %s", str(e))
 
                     # Check timeout
                     if timeout and (time.time() - start_time) > timeout:
@@ -322,7 +322,7 @@ class ConcurrentExecutor:
 
         return results
 
-    def get_performance_stats(self) -> Dict[str, Any]:
+    def get_performance_stats(self) -> dict[str, Any]:
         """Get comprehensive performance statistics."""
         total_tasks = self.completed_tasks.get() + self.failed_tasks.get()
         success_rate = self.completed_tasks.get() / total_tasks if total_tasks > 0 else 0.0
@@ -394,7 +394,7 @@ class ConcurrentExecutor:
                 self._shutdown_event.wait(30)  # Check every 30 seconds
 
             except Exception as e:
-                logger.error("Error in auto-scaling worker: %s", str(e))
+                logger.exception("Error in auto-scaling worker: %s", str(e))
                 self._shutdown_event.wait(60)  # Wait longer on error
 
     def _scale_workers(self, new_count: int) -> None:
@@ -453,7 +453,7 @@ class ConcurrentExecutor:
             self.executor.shutdown(wait=wait, timeout=timeout)
             logger.info("Concurrent executor shutdown complete")
         except Exception as e:
-            logger.error("Error during executor shutdown: %s", str(e))
+            logger.exception("Error during executor shutdown: %s", str(e))
 
 
 # Global concurrent executor instance
@@ -471,7 +471,7 @@ def concurrent_task(timeout: Optional[float] = None):
     def decorator(func):
         def wrapper(*args, **kwargs):
             # Submit task to concurrent executor
-            task_id = concurrent_executor.submit_task(func, *args, **kwargs)
+            concurrent_executor.submit_task(func, *args, **kwargs)
 
             # For now, we'll execute synchronously and return the result
             # In a real async environment, this would return a Future

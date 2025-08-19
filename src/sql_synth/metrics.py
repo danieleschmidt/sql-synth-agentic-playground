@@ -11,7 +11,7 @@ import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 
 @dataclass
@@ -44,7 +44,7 @@ class PerformanceStats:
     min_generation_time: float = 0.0
     max_generation_time: float = 0.0
     last_24h_queries: int = 0
-    error_types: Dict[str, int] = field(default_factory=dict)
+    error_types: dict[str, int] = field(default_factory=dict)
 
 
 class MetricsCollector:
@@ -131,7 +131,7 @@ class MetricsCollector:
         for alert in alerts:
             self.logger.warning(f"Performance alert: {alert}")
 
-    def _get_recent_metrics(self, time_window: timedelta) -> List[QueryMetric]:
+    def _get_recent_metrics(self, time_window: timedelta) -> list[QueryMetric]:
         """Get metrics within a time window."""
         cutoff_time = datetime.now() - time_window
         return [m for m in self.metrics if m.timestamp >= cutoff_time]
@@ -203,7 +203,7 @@ class MetricsCollector:
                 error_types=dict(error_types),
             )
 
-    def _percentile(self, data: List[float], percentile: int) -> float:
+    def _percentile(self, data: list[float], percentile: int) -> float:
         """Calculate percentile of a dataset."""
         if not data:
             return 0.0
@@ -211,7 +211,7 @@ class MetricsCollector:
         index = int((percentile / 100.0) * len(sorted_data))
         return sorted_data[min(index, len(sorted_data) - 1)]
 
-    def get_health_status(self) -> Dict[str, Any]:
+    def get_health_status(self) -> dict[str, Any]:
         """Get overall system health status."""
         recent_stats = self.get_performance_stats(timedelta(minutes=15))
 
@@ -302,7 +302,7 @@ class QueryMetrics:
                 if rows_returned is not None:
                     last_metric.rows_returned = rows_returned
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get metrics summary."""
         stats = self.collector.get_performance_stats()
         health = self.collector.get_health_status()
@@ -320,10 +320,10 @@ class QueryMetrics:
             "thresholds": self.collector.alert_thresholds,
         }
 
-    def get_summary_metrics(self) -> Dict[str, Any]:
+    def get_summary_metrics(self) -> dict[str, Any]:
         """Get summary metrics (alternative format for compatibility)."""
         stats = self.collector.get_performance_stats()
-        
+
         return {
             "total_queries": stats.total_queries,
             "successful_queries": stats.successful_queries,
@@ -352,8 +352,7 @@ def monitor_performance(operation_name: str):
             error = None
 
             try:
-                result = func(*args, **kwargs)
-                return result
+                return func(*args, **kwargs)
             except Exception as e:
                 success = False
                 error = str(e)

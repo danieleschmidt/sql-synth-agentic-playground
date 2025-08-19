@@ -9,7 +9,7 @@ import re
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Optional
 
 import sqlparse
 from sqlparse import sql
@@ -44,30 +44,30 @@ class ValidationIssue:
     message: str
     location: Optional[str] = None
     suggestion: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: Optional[dict[str, Any]] = None
 
 
 @dataclass
 class ValidationResult:
     """Comprehensive validation result."""
     is_valid: bool
-    issues: List[ValidationIssue]
+    issues: list[ValidationIssue]
     validation_score: float  # 0.0 to 1.0
     execution_time: float
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
 
     @property
-    def critical_issues(self) -> List[ValidationIssue]:
+    def critical_issues(self) -> list[ValidationIssue]:
         """Get critical issues that prevent execution."""
         return [issue for issue in self.issues if issue.severity == ValidationSeverity.CRITICAL]
 
     @property
-    def error_issues(self) -> List[ValidationIssue]:
+    def error_issues(self) -> list[ValidationIssue]:
         """Get error issues that should block execution."""
         return [issue for issue in self.issues if issue.severity == ValidationSeverity.ERROR]
 
     @property
-    def warning_issues(self) -> List[ValidationIssue]:
+    def warning_issues(self) -> list[ValidationIssue]:
         """Get warning issues that should be noted."""
         return [issue for issue in self.issues if issue.severity == ValidationSeverity.WARNING]
 
@@ -105,10 +105,10 @@ class NaturalLanguageValidator:
 
     def validate(self, natural_query: str) -> ValidationResult:
         """Validate natural language query input.
-        
+
         Args:
             natural_query: User's natural language query
-            
+
         Returns:
             Validation result with issues and score
         """
@@ -150,7 +150,7 @@ class NaturalLanguageValidator:
             },
         )
 
-    def _validate_basic_input(self, query: str) -> List[ValidationIssue]:
+    def _validate_basic_input(self, query: str) -> list[ValidationIssue]:
         """Validate basic input requirements."""
         issues = []
 
@@ -197,7 +197,7 @@ class NaturalLanguageValidator:
 
         return issues
 
-    def _validate_security(self, query: str) -> List[ValidationIssue]:
+    def _validate_security(self, query: str) -> list[ValidationIssue]:
         """Validate query for security concerns."""
         issues = []
 
@@ -231,7 +231,7 @@ class NaturalLanguageValidator:
 
         return issues
 
-    def _analyze_complexity(self, query: str) -> List[ValidationIssue]:
+    def _analyze_complexity(self, query: str) -> list[ValidationIssue]:
         """Analyze query complexity and provide guidance."""
         issues = []
 
@@ -273,7 +273,7 @@ class NaturalLanguageValidator:
 
         return issues
 
-    def _validate_business_logic(self, query: str) -> List[ValidationIssue]:
+    def _validate_business_logic(self, query: str) -> list[ValidationIssue]:
         """Validate business logic aspects of the query."""
         issues = []
 
@@ -319,7 +319,7 @@ class NaturalLanguageValidator:
             return "complex"
         return "very_complex"
 
-    def _calculate_validation_score(self, issues: List[ValidationIssue]) -> float:
+    def _calculate_validation_score(self, issues: list[ValidationIssue]) -> float:
         """Calculate overall validation score."""
         if not issues:
             return 1.0
@@ -333,9 +333,8 @@ class NaturalLanguageValidator:
         }
 
         total_penalty = sum(severity_weights.get(issue.severity, 0.1) for issue in issues)
-        score = max(0.0, 1.0 - total_penalty)
+        return max(0.0, 1.0 - total_penalty)
 
-        return score
 
 
 class SQLValidator:
@@ -355,13 +354,13 @@ class SQLValidator:
     def __init__(self) -> None:
         pass
 
-    def validate(self, sql_query: str, schema_info: Optional[Dict] = None) -> ValidationResult:
+    def validate(self, sql_query: str, schema_info: Optional[dict] = None) -> ValidationResult:
         """Comprehensive SQL validation.
-        
+
         Args:
             sql_query: Generated SQL query to validate
             schema_info: Optional database schema information
-            
+
         Returns:
             Validation result with detailed analysis
         """
@@ -420,7 +419,7 @@ class SQLValidator:
             },
         )
 
-    def _validate_syntax(self, parsed: sql.Statement, sql_query: str) -> List[ValidationIssue]:
+    def _validate_syntax(self, parsed: sql.Statement, sql_query: str) -> list[ValidationIssue]:
         """Validate SQL syntax and structure."""
         issues = []
 
@@ -458,7 +457,7 @@ class SQLValidator:
 
         return issues
 
-    def _validate_security(self, parsed: sql.Statement, sql_query: str) -> List[ValidationIssue]:
+    def _validate_security(self, parsed: sql.Statement, sql_query: str) -> list[ValidationIssue]:
         """Validate SQL security aspects."""
         issues = []
 
@@ -492,7 +491,7 @@ class SQLValidator:
 
         return issues
 
-    def _validate_performance(self, parsed: sql.Statement, sql_query: str) -> List[ValidationIssue]:
+    def _validate_performance(self, parsed: sql.Statement, sql_query: str) -> list[ValidationIssue]:
         """Validate SQL performance implications."""
         issues = []
 
@@ -545,14 +544,14 @@ class SQLValidator:
         self,
         parsed: sql.Statement,
         sql_query: str,
-        schema_info: Dict,
-    ) -> List[ValidationIssue]:
+        schema_info: dict,
+    ) -> list[ValidationIssue]:
         """Validate query against database schema."""
         issues = []
 
         # Extract table and column references
         table_refs = self._extract_table_references(sql_query)
-        column_refs = self._extract_column_references(sql_query)
+        self._extract_column_references(sql_query)
 
         # Validate table existence
         available_tables = schema_info.get("tables", [])
@@ -568,7 +567,7 @@ class SQLValidator:
 
         return issues
 
-    def _extract_table_references(self, sql_query: str) -> Set[str]:
+    def _extract_table_references(self, sql_query: str) -> set[str]:
         """Extract table names from SQL query."""
         # Simplified table extraction - in production, use proper SQL parsing
         table_pattern = r"\bFROM\s+(\w+)"
@@ -584,7 +583,7 @@ class SQLValidator:
 
         return tables
 
-    def _extract_column_references(self, sql_query: str) -> Set[str]:
+    def _extract_column_references(self, sql_query: str) -> set[str]:
         """Extract column names from SQL query."""
         # Simplified column extraction
         # In production, would use proper SQL AST parsing
@@ -603,11 +602,11 @@ class SQLValidator:
 
         return columns
 
-    def _analyze_query_characteristics(self, parsed: sql.Statement, sql_query: str) -> Dict[str, Any]:
+    def _analyze_query_characteristics(self, parsed: sql.Statement, sql_query: str) -> dict[str, Any]:
         """Analyze query characteristics for insights."""
         sql_upper = sql_query.upper()
 
-        characteristics = {
+        return {
             "has_joins": "JOIN" in sql_upper,
             "has_subqueries": sql_query.count("(") > 0,
             "has_aggregations": any(func in sql_upper for func in ["COUNT", "SUM", "AVG", "MIN", "MAX"]),
@@ -620,7 +619,6 @@ class SQLValidator:
             "estimated_complexity": "high" if sql_upper.count("JOIN") > 2 or sql_query.count("(") > 3 else "medium" if "JOIN" in sql_upper or sql_query.count("(") > 0 else "low",
         }
 
-        return characteristics
 
     def _estimate_result_size(self, parsed: sql.Statement, sql_query: str) -> str:
         """Estimate result set size category."""
@@ -645,7 +643,7 @@ class SQLValidator:
             return "large"
         return "unknown"
 
-    def _calculate_sql_score(self, issues: List[ValidationIssue], sql_query: str) -> float:
+    def _calculate_sql_score(self, issues: list[ValidationIssue], sql_query: str) -> float:
         """Calculate SQL quality score."""
         base_score = 1.0
 
@@ -671,8 +669,7 @@ class SQLValidator:
         if sql_query.strip().endswith(";"):
             bonus += 0.05
 
-        final_score = max(0.0, min(1.0, base_score - total_penalty + bonus))
-        return final_score
+        return max(0.0, min(1.0, base_score - total_penalty + bonus))
 
 
 class ComprehensiveValidator:
@@ -686,7 +683,7 @@ class ComprehensiveValidator:
         """Validate natural language input."""
         return self.nl_validator.validate(query)
 
-    def validate_sql(self, sql_query: str, schema_info: Optional[Dict] = None) -> ValidationResult:
+    def validate_sql(self, sql_query: str, schema_info: Optional[dict] = None) -> ValidationResult:
         """Validate generated SQL."""
         return self.sql_validator.validate(sql_query, schema_info)
 
@@ -694,15 +691,15 @@ class ComprehensiveValidator:
         self,
         natural_query: str,
         generated_sql: str,
-        schema_info: Optional[Dict] = None,
-    ) -> Tuple[ValidationResult, ValidationResult]:
+        schema_info: Optional[dict] = None,
+    ) -> tuple[ValidationResult, ValidationResult]:
         """Perform end-to-end validation of the complete pipeline.
-        
+
         Args:
             natural_query: Original natural language query
             generated_sql: Generated SQL query
             schema_info: Optional database schema information
-            
+
         Returns:
             Tuple of (natural language result, SQL result)
         """

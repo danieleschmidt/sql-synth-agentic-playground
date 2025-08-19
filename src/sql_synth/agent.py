@@ -6,7 +6,7 @@ using LangChain's SQL agent toolkit with comprehensive security and validation.
 
 import logging
 import time
-from typing import Any, ClassVar, Dict
+from typing import Any, ClassVar
 
 from langchain.agents import AgentType
 from langchain_community.agent_toolkits.sql.base import create_sql_agent
@@ -23,6 +23,7 @@ from .error_handling import (
     error_context,
     global_error_manager,
 )
+from .intelligent_performance_engine import global_performance_engine
 from .metrics import QueryMetrics
 from .performance_optimizer import (
     global_profiler,
@@ -30,7 +31,6 @@ from .performance_optimizer import (
     optimize_operation,
 )
 from .security import security_auditor
-from .intelligent_performance_engine import global_performance_engine
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +73,7 @@ class SQLSynthesisAgent:
 
         # Initialize metrics tracker
         self.metrics = QueryMetrics()
-        
+
         # Start intelligent performance engine
         global_performance_engine.start_intelligent_optimization()
 
@@ -84,7 +84,8 @@ class SQLSynthesisAgent:
             logger.info("SQLDatabase instance created successfully")
         except Exception as e:
             logger.exception("Failed to create SQLDatabase instance")
-            raise RuntimeError(f"SQLDatabase creation failed: {e}") from e
+            msg = f"SQLDatabase creation failed: {e}"
+            raise RuntimeError(msg) from e
 
         # Initialize LLM
         try:
@@ -96,7 +97,8 @@ class SQLSynthesisAgent:
             logger.info("LLM initialized: %s", model_name)
         except Exception as e:
             logger.exception("Failed to initialize LLM")
-            raise RuntimeError(f"LLM initialization failed: {e}") from e
+            msg = f"LLM initialization failed: {e}"
+            raise RuntimeError(msg) from e
 
         # Create SQL agent
         try:
@@ -112,7 +114,8 @@ class SQLSynthesisAgent:
             logger.info("SQL agent created successfully")
         except Exception as e:
             logger.exception("Failed to create SQL agent")
-            raise RuntimeError(f"SQL agent creation failed: {e}") from e
+            msg = f"SQL agent creation failed: {e}"
+            raise RuntimeError(msg) from e
 
     @optimize_operation("sql_generation")
     @cache_generation_result(ttl=3600)
@@ -144,7 +147,8 @@ class SQLSynthesisAgent:
                     error_issues = [issue for issue in validation_result.issues
                                   if issue.severity in [ValidationSeverity.CRITICAL, ValidationSeverity.ERROR]]
                     error_messages = [issue.message for issue in error_issues]
-                    raise ValueError(f"Input validation failed: {'; '.join(error_messages)}")
+                    msg = f"Input validation failed: {'; '.join(error_messages)}"
+                    raise ValueError(msg)
 
                 # Log validation warnings
                 warning_issues = [issue for issue in validation_result.issues
@@ -169,9 +173,9 @@ class SQLSynthesisAgent:
                         "natural_query": natural_language_query[:100],
                         "complexity_threshold": 5.0,
                         "performance_target": 1.0,
-                    }
+                    },
                 )
-                
+
                 if intelligent_optimization.get("optimizations_applied"):
                     logger.info(f"Applied intelligent optimizations: {intelligent_optimization['optimizations_applied']}")
                     sql_query = intelligent_optimization["optimized_query"]
@@ -194,7 +198,8 @@ class SQLSynthesisAgent:
                 is_safe, violations = self.security_validator.audit_generated_query(sql_query)
                 if not is_safe:
                     violation_reasons = [str(v) for v in violations]
-                    raise ValueError(f"Security validation failed: {'; '.join(violation_reasons)}")
+                    msg = f"Security validation failed: {'; '.join(violation_reasons)}"
+                    raise ValueError(msg)
 
                 # Advanced SQL validation
                 schema_info = self.get_schema_info()
@@ -204,7 +209,8 @@ class SQLSynthesisAgent:
                     error_issues = [issue for issue in sql_validation_result.issues
                                   if issue.severity in [ValidationSeverity.CRITICAL, ValidationSeverity.ERROR]]
                     error_messages = [issue.message for issue in error_issues]
-                    raise ValueError(f"SQL validation failed: {'; '.join(error_messages)}")
+                    msg = f"SQL validation failed: {'; '.join(error_messages)}"
+                    raise ValueError(msg)
 
                 # Log SQL validation warnings
                 warning_issues = [issue for issue in sql_validation_result.issues
@@ -224,15 +230,15 @@ class SQLSynthesisAgent:
                     generation_time=generation_time,
                     query_length=len(sql_query),
                 )
-                
+
                 # Record performance metrics for intelligent engine
                 global_performance_engine.record_performance({
-                    'response_time': generation_time,
-                    'query_complexity': intelligent_optimization.get('complexity_score', 0.0),
-                    'optimization_score': intelligent_optimization.get('optimization_score', 0.0),
-                    'cache_hit_rate': 0.0,  # Will be updated by caching system
-                    'error_rate': 0.0,
-                    'concurrent_requests': 1,
+                    "response_time": generation_time,
+                    "query_complexity": intelligent_optimization.get("complexity_score", 0.0),
+                    "optimization_score": intelligent_optimization.get("optimization_score", 0.0),
+                    "cache_hit_rate": 0.0,  # Will be updated by caching system
+                    "error_rate": 0.0,
+                    "concurrent_requests": 1,
                 })
 
                 return {
@@ -342,13 +348,15 @@ class SQLSynthesisAgent:
                     error_issues = [issue for issue in sql_validation_result.issues
                                   if issue.severity in [ValidationSeverity.CRITICAL, ValidationSeverity.ERROR]]
                     error_messages = [issue.message for issue in error_issues]
-                    raise ValueError(f"SQL validation failed: {'; '.join(error_messages)}")
+                    msg = f"SQL validation failed: {'; '.join(error_messages)}"
+                    raise ValueError(msg)
 
                 # Legacy security validation
                 is_safe, violations = self.security_validator.audit_generated_query(sql_query)
                 if not is_safe:
                     violation_reasons = [str(v) for v in violations]
-                    raise ValueError(f"Security validation failed: {'; '.join(violation_reasons)}")
+                    msg = f"Security validation failed: {'; '.join(violation_reasons)}"
+                    raise ValueError(msg)
 
                 # Add LIMIT clause if not present and not a metadata query
                 limited_query = self._add_limit_if_needed(sql_query, limit)
@@ -449,7 +457,7 @@ class SQLSynthesisAgent:
         performance_stats = global_profiler.get_performance_summary()
         resource_stats = global_profiler.get_resource_summary()
         optimization_stats = global_query_optimizer.get_cache_stats()
-        
+
         # Get intelligent performance insights
         intelligent_insights = global_performance_engine.get_performance_insights()
         scaling_recommendation = global_performance_engine.get_scaling_recommendation()
@@ -473,13 +481,13 @@ class SQLSynthesisAgent:
             },
         }
 
-    def _calculate_reliability_score(self, metrics: Dict[str, Any], error_stats: Dict[str, Any]) -> float:
+    def _calculate_reliability_score(self, metrics: dict[str, Any], error_stats: dict[str, Any]) -> float:
         """Calculate overall reliability score.
-        
+
         Args:
             metrics: Performance metrics
             error_stats: Error statistics
-            
+
         Returns:
             Reliability score between 0.0 and 1.0
         """
@@ -488,7 +496,7 @@ class SQLSynthesisAgent:
             return 1.0
 
         total_errors = error_stats.get("total_errors", 0)
-        error_rate = total_errors / total_operations
+        total_errors / total_operations
 
         # Base reliability from success rates
         gen_success_rate = metrics.get("generation_success_rate", 1.0)
@@ -499,16 +507,15 @@ class SQLSynthesisAgent:
         recent_errors = error_stats.get("recent_errors_1h", 0)
         recent_penalty = min(recent_errors * 0.05, 0.3)  # Max 30% penalty
 
-        reliability_score = max(0.0, base_reliability - recent_penalty)
-        return reliability_score
+        return max(0.0, base_reliability - recent_penalty)
 
-    def _calculate_performance_score(self, perf_stats: Dict[str, Any], resource_stats: Dict[str, Any]) -> float:
+    def _calculate_performance_score(self, perf_stats: dict[str, Any], resource_stats: dict[str, Any]) -> float:
         """Calculate overall performance score.
-        
+
         Args:
             perf_stats: Performance statistics
             resource_stats: Resource utilization statistics
-            
+
         Returns:
             Performance score between 0.0 and 1.0
         """
@@ -542,10 +549,12 @@ class SQLSynthesisAgent:
             ValueError: If validation fails
         """
         if not query or not query.strip():
-            raise ValueError("Query cannot be empty")
+            msg = "Query cannot be empty"
+            raise ValueError(msg)
 
         if len(query) > self.MAX_QUERY_LENGTH:
-            raise ValueError(f"Query too long (max {self.MAX_QUERY_LENGTH} characters)")
+            msg = f"Query too long (max {self.MAX_QUERY_LENGTH} characters)"
+            raise ValueError(msg)
 
         # Check for potential SQL injection in natural language
         suspicious_patterns = ["';", "--", "/*", "*/", "xp_", "sp_"]
@@ -571,8 +580,7 @@ class SQLSynthesisAgent:
         for attempt in range(1, self.max_retries + 1):
             try:
                 logger.info("SQL generation attempt %d/%d", attempt, self.max_retries)
-                result = self.agent.run(query)
-                return result
+                return self.agent.run(query)
             except Exception as e:
                 last_error = e
                 logger.warning("Attempt %d failed: %s", attempt, str(e))
@@ -594,7 +602,8 @@ class SQLSynthesisAgent:
                 error_context_dict,
             )
 
-        raise RuntimeError(f"SQL generation failed after {self.max_retries} attempts: {last_error}")
+        msg = f"SQL generation failed after {self.max_retries} attempts: {last_error}"
+        raise RuntimeError(msg)
 
     def _extract_sql_from_result(self, result: str) -> str:
         """Extract SQL query from agent result.
@@ -636,7 +645,8 @@ class SQLSynthesisAgent:
             for line in lines:
                 if "SELECT" in line.upper():
                     return line.strip()
-            raise ValueError("No SQL query found in agent response")
+            msg = "No SQL query found in agent response"
+            raise ValueError(msg)
 
         sql_query = " ".join(sql_lines)
 
@@ -657,7 +667,8 @@ class SQLSynthesisAgent:
             ValueError: If validation fails
         """
         if not sql_query or not sql_query.strip():
-            raise ValueError("Generated SQL is empty")
+            msg = "Generated SQL is empty"
+            raise ValueError(msg)
 
         sql_upper = sql_query.upper().strip()
 
@@ -746,4 +757,5 @@ class AgentFactory:
             )
         except Exception as e:
             logger.exception("Failed to create SQL synthesis agent")
-            raise RuntimeError(f"Agent creation failed: {e}") from e
+            msg = f"Agent creation failed: {e}"
+            raise RuntimeError(msg) from e

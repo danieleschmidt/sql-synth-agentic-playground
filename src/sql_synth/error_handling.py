@@ -9,7 +9,7 @@ import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, TypeVar
+from typing import Any, Callable, Optional, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ class ErrorContext:
     original_exception: Optional[Exception] = None
     timestamp: float = 0.0
     retry_count: int = 0
-    metadata: Dict[str, Any] = None
+    metadata: dict[str, Any] = None
 
     def __post_init__(self) -> None:
         if self.timestamp == 0.0:
@@ -125,10 +125,10 @@ class ErrorClassifier:
     @classmethod
     def classify_error(cls, error: Exception) -> ErrorCategory:
         """Classify error based on exception type and message.
-        
+
         Args:
             error: Exception to classify
-            
+
         Returns:
             Classified error category
         """
@@ -157,11 +157,11 @@ class ErrorClassifier:
     @classmethod
     def determine_severity(cls, category: ErrorCategory, error: Exception) -> ErrorSeverity:
         """Determine error severity based on category and context.
-        
+
         Args:
             category: Error category
             error: Original exception
-            
+
         Returns:
             Determined severity level
         """
@@ -201,10 +201,10 @@ class RetryStrategy:
 
     def should_retry(self, error_context: ErrorContext) -> bool:
         """Determine if operation should be retried.
-        
+
         Args:
             error_context: Error context containing retry information
-            
+
         Returns:
             True if should retry, False otherwise
         """
@@ -231,10 +231,10 @@ class RetryStrategy:
 
     def calculate_delay(self, attempt: int) -> float:
         """Calculate delay before next retry attempt.
-        
+
         Args:
             attempt: Current attempt number (0-based)
-            
+
         Returns:
             Delay in seconds
         """
@@ -253,8 +253,8 @@ class ErrorRecoveryManager:
 
     def __init__(self, retry_strategy: Optional[RetryStrategy] = None) -> None:
         self.retry_strategy = retry_strategy or RetryStrategy()
-        self.error_history: List[ErrorContext] = []
-        self.recovery_handlers: Dict[ErrorCategory, List[Callable]] = {}
+        self.error_history: list[ErrorContext] = []
+        self.recovery_handlers: dict[ErrorCategory, list[Callable]] = {}
 
     def register_recovery_handler(
         self,
@@ -262,7 +262,7 @@ class ErrorRecoveryManager:
         handler: Callable[[ErrorContext], Optional[Any]],
     ) -> None:
         """Register a recovery handler for specific error category.
-        
+
         Args:
             category: Error category to handle
             handler: Recovery handler function
@@ -275,15 +275,15 @@ class ErrorRecoveryManager:
         self,
         error: Exception,
         operation_name: str = "unknown",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> ErrorContext:
         """Handle error with classification and recovery attempts.
-        
+
         Args:
             error: Exception that occurred
             operation_name: Name of the operation that failed
             metadata: Additional context metadata
-            
+
         Returns:
             Error context with handling information
         """
@@ -314,7 +314,7 @@ class ErrorRecoveryManager:
 
     def _log_error(self, error_context: ErrorContext) -> None:
         """Log error with appropriate level based on severity.
-        
+
         Args:
             error_context: Error context to log
         """
@@ -334,10 +334,10 @@ class ErrorRecoveryManager:
 
     def _attempt_recovery(self, error_context: ErrorContext) -> Optional[Any]:
         """Attempt error recovery using registered handlers.
-        
+
         Args:
             error_context: Error context for recovery
-            
+
         Returns:
             Recovery result if successful, None otherwise
         """
@@ -356,9 +356,9 @@ class ErrorRecoveryManager:
 
         return None
 
-    def get_error_statistics(self) -> Dict[str, Any]:
+    def get_error_statistics(self) -> dict[str, Any]:
         """Get error statistics and patterns.
-        
+
         Returns:
             Dictionary containing error statistics
         """
@@ -393,18 +393,18 @@ class ErrorRecoveryManager:
 def error_context(
     operation_name: str,
     recovery_manager: ErrorRecoveryManager,
-    metadata: Optional[Dict[str, Any]] = None,
+    metadata: Optional[dict[str, Any]] = None,
 ):
     """Context manager for comprehensive error handling.
-    
+
     Args:
         operation_name: Name of the operation being performed
         recovery_manager: Error recovery manager instance
         metadata: Additional context metadata
-        
+
     Yields:
         None
-        
+
     Raises:
         SQLSynthesisError: Re-raised with enhanced context
     """
@@ -436,12 +436,12 @@ def retry_with_backoff(
     recovery_manager: Optional[ErrorRecoveryManager] = None,
 ) -> Callable[..., T]:
     """Decorator for automatic retry with intelligent backoff.
-    
+
     Args:
         func: Function to wrap with retry logic
         retry_strategy: Retry strategy configuration
         recovery_manager: Error recovery manager
-        
+
     Returns:
         Wrapped function with retry capability
     """
@@ -482,7 +482,8 @@ def retry_with_backoff(
             raise SQLSynthesisError(last_error_context)
 
         # Should never reach here
-        raise RuntimeError("Retry logic error: no exception context available")
+        msg = "Retry logic error: no exception context available"
+        raise RuntimeError(msg)
 
     return wrapper
 

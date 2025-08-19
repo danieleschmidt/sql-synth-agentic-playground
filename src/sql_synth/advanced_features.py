@@ -18,7 +18,7 @@ from abc import ABC, abstractmethod
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +40,8 @@ class TenantConfig:
     max_concurrent_queries: int
     cache_ttl_seconds: int
     query_timeout_seconds: int
-    allowed_databases: List[str] = field(default_factory=list)
-    feature_flags: Dict[str, bool] = field(default_factory=dict)
+    allowed_databases: list[str] = field(default_factory=list)
+    feature_flags: dict[str, bool] = field(default_factory=dict)
 
 
 class CacheBackend(ABC):
@@ -68,7 +68,7 @@ class MemoryCacheBackend(CacheBackend):
     """In-memory cache backend for development and testing."""
 
     def __init__(self, max_size: int = 1000):
-        self.cache: Dict[str, Tuple[Any, float]] = {}
+        self.cache: dict[str, tuple[Any, float]] = {}
         self.max_size = max_size
 
     async def get(self, key: str) -> Optional[Any]:
@@ -92,7 +92,7 @@ class MemoryCacheBackend(CacheBackend):
         self.cache.pop(key, None)
 
     async def flush_tenant(self, tenant_id: str) -> None:
-        keys_to_delete = [k for k in self.cache.keys() if k.startswith(f"tenant:{tenant_id}:")]
+        keys_to_delete = [k for k in self.cache if k.startswith(f"tenant:{tenant_id}:")]
         for key in keys_to_delete:
             del self.cache[key]
 
@@ -108,9 +108,9 @@ class QueryPlanOptimizer:
             "optimize_aggregations": True,
         }
 
-    def analyze_query_plan(self, sql_query: str, schema_info: Dict[str, Any]) -> Dict[str, Any]:
+    def analyze_query_plan(self, sql_query: str, schema_info: dict[str, Any]) -> dict[str, Any]:
         """Analyze query execution plan and suggest optimizations."""
-        analysis = {
+        return {
             "query_hash": hashlib.sha256(sql_query.encode()).hexdigest()[:16],
             "estimated_cost": self._estimate_query_cost(sql_query),
             "index_suggestions": self._generate_index_suggestions(sql_query, schema_info),
@@ -118,7 +118,6 @@ class QueryPlanOptimizer:
             "complexity_score": self._calculate_complexity_score(sql_query),
             "risk_level": self._assess_query_risk(sql_query),
         }
-        return analysis
 
     def _estimate_query_cost(self, sql_query: str) -> float:
         """Estimate relative query execution cost."""
@@ -141,7 +140,7 @@ class QueryPlanOptimizer:
 
         return min(cost, 10.0)  # Cap at 10.0
 
-    def _generate_index_suggestions(self, sql_query: str, schema_info: Dict[str, Any]) -> List[str]:
+    def _generate_index_suggestions(self, sql_query: str, schema_info: dict[str, Any]) -> list[str]:
         """Generate index suggestions based on query patterns."""
         suggestions = []
 
@@ -157,7 +156,7 @@ class QueryPlanOptimizer:
 
         return suggestions
 
-    def _generate_optimization_suggestions(self, sql_query: str) -> List[str]:
+    def _generate_optimization_suggestions(self, sql_query: str) -> list[str]:
         """Generate query optimization suggestions."""
         suggestions = []
 
@@ -203,11 +202,11 @@ class ABTestingFramework:
     """A/B testing framework for SQL generation strategies."""
 
     def __init__(self):
-        self.experiments: Dict[str, Dict[str, Any]] = {}
-        self.results: Dict[str, List[Dict[str, Any]]] = {}
+        self.experiments: dict[str, dict[str, Any]] = {}
+        self.results: dict[str, list[dict[str, Any]]] = {}
 
-    def create_experiment(self, experiment_id: str, variants: List[str],
-                         traffic_split: Dict[str, float]) -> None:
+    def create_experiment(self, experiment_id: str, variants: list[str],
+                         traffic_split: dict[str, float]) -> None:
         """Create a new A/B test experiment."""
         self.experiments[experiment_id] = {
             "variants": variants,
@@ -236,7 +235,7 @@ class ABTestingFramework:
         return "control"
 
     def record_result(self, experiment_id: str, variant: str, user_id: str,
-                     metrics: Dict[str, Any]) -> None:
+                     metrics: dict[str, Any]) -> None:
         """Record experiment result."""
         if experiment_id not in self.results:
             self.results[experiment_id] = []
@@ -248,7 +247,7 @@ class ABTestingFramework:
             "timestamp": time.time(),
         })
 
-    def get_experiment_summary(self, experiment_id: str) -> Dict[str, Any]:
+    def get_experiment_summary(self, experiment_id: str) -> dict[str, Any]:
         """Get experiment performance summary."""
         if experiment_id not in self.results:
             return {"error": "Experiment not found"}
@@ -278,10 +277,10 @@ class DistributedProcessingManager:
     def __init__(self, max_workers: int = 4, use_processes: bool = False):
         self.max_workers = max_workers
         self.executor = ProcessPoolExecutor(max_workers) if use_processes else ThreadPoolExecutor(max_workers)
-        self.active_tasks: Dict[str, asyncio.Future] = {}
+        self.active_tasks: dict[str, asyncio.Future] = {}
 
-    async def process_batch(self, queries: List[Dict[str, Any]],
-                          processor_func: callable) -> List[Dict[str, Any]]:
+    async def process_batch(self, queries: list[dict[str, Any]],
+                          processor_func: callable) -> list[dict[str, Any]]:
         """Process a batch of queries in parallel."""
         loop = asyncio.get_event_loop()
 
@@ -300,7 +299,7 @@ class DistributedProcessingManager:
                 result = await task
                 results.append(result)
             except Exception as e:
-                logger.error("Task %s failed: %s", task_id, str(e))
+                logger.exception("Task %s failed: %s", task_id, str(e))
                 results.append({"error": str(e), "task_id": task_id})
             finally:
                 self.active_tasks.pop(task_id, None)
@@ -320,8 +319,8 @@ class RealTimeMonitoring:
     """Real-time monitoring and alerting system."""
 
     def __init__(self):
-        self.metrics: Dict[str, List[float]] = {}
-        self.alerts: List[Dict[str, Any]] = []
+        self.metrics: dict[str, list[float]] = {}
+        self.alerts: list[dict[str, Any]] = []
         self.thresholds = {
             "avg_response_time": 5.0,  # seconds
             "error_rate": 0.05,        # 5%
@@ -360,7 +359,7 @@ class RealTimeMonitoring:
                 logger.warning("Alert: %s = %f exceeds threshold %f",
                              metric_name, value, threshold)
 
-    def get_metric_summary(self, metric_name: str) -> Dict[str, Any]:
+    def get_metric_summary(self, metric_name: str) -> dict[str, Any]:
         """Get summary statistics for a metric."""
         if metric_name not in self.metrics or not self.metrics[metric_name]:
             return {"error": "No data available"}
@@ -374,7 +373,7 @@ class RealTimeMonitoring:
             "latest": values[-1] if values else None,
         }
 
-    def get_recent_alerts(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_recent_alerts(self, limit: int = 10) -> list[dict[str, Any]]:
         """Get recent alerts."""
         return sorted(self.alerts, key=lambda x: x["timestamp"], reverse=True)[:limit]
 
@@ -400,8 +399,8 @@ class ProductionSQLSynthesizer:
         self.monitoring = monitoring
 
         # Tenant management
-        self.tenant_configs: Dict[str, TenantConfig] = {}
-        self.rate_limiters: Dict[str, Dict[str, float]] = {}  # tenant_id -> {last_reset, query_count}
+        self.tenant_configs: dict[str, TenantConfig] = {}
+        self.rate_limiters: dict[str, dict[str, float]] = {}  # tenant_id -> {last_reset, query_count}
 
     def register_tenant(self, tenant_config: TenantConfig) -> None:
         """Register a new tenant with specific configuration."""
@@ -417,8 +416,8 @@ class ProductionSQLSynthesizer:
                                     tenant_id: str,
                                     user_id: str,
                                     natural_query: str,
-                                    schema_info: Dict[str, Any],
-                                    context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+                                    schema_info: dict[str, Any],
+                                    context: Optional[dict[str, Any]] = None) -> dict[str, Any]:
         """Advanced SQL synthesis with all production features."""
         start_time = time.time()
 
@@ -510,7 +509,7 @@ class ProductionSQLSynthesizer:
         return True
 
     def _generate_cache_key(self, tenant_id: str, natural_query: str,
-                          schema_info: Dict[str, Any]) -> str:
+                          schema_info: dict[str, Any]) -> str:
         """Generate cache key for query result."""
         # Create a hash of the query and schema for cache key
         content = f"{tenant_id}:{natural_query}:{json.dumps(schema_info, sort_keys=True)}"
@@ -518,8 +517,8 @@ class ProductionSQLSynthesizer:
         return f"tenant:{tenant_id}:query:{hash_key[:16]}"
 
     async def _generate_sql_with_variant(self, variant: str, natural_query: str,
-                                       schema_info: Dict[str, Any],
-                                       context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+                                       schema_info: dict[str, Any],
+                                       context: Optional[dict[str, Any]]) -> dict[str, Any]:
         """Generate SQL using specified A/B test variant strategy."""
         # This is where you'd implement different SQL generation strategies
         # For now, return a mock successful result
@@ -540,7 +539,7 @@ class ProductionSQLSynthesizer:
             "confidence": 0.85,
         }
 
-    async def get_tenant_analytics(self, tenant_id: str) -> Dict[str, Any]:
+    async def get_tenant_analytics(self, tenant_id: str) -> dict[str, Any]:
         """Get comprehensive analytics for a tenant."""
         tenant_config = self.tenant_configs.get(tenant_id)
         if not tenant_config:
@@ -558,7 +557,7 @@ class ProductionSQLSynthesizer:
             "performance_metrics": self._get_performance_metrics(),
         }
 
-    async def _get_cache_metrics(self, tenant_id: str) -> Dict[str, Any]:
+    async def _get_cache_metrics(self, tenant_id: str) -> dict[str, Any]:
         """Get cache-related metrics for tenant."""
         # This would integrate with actual cache backend metrics
         return {
@@ -567,7 +566,7 @@ class ProductionSQLSynthesizer:
             "evictions_last_hour": 12,
         }
 
-    def _get_performance_metrics(self) -> Dict[str, Any]:
+    def _get_performance_metrics(self) -> dict[str, Any]:
         """Get system-wide performance metrics."""
         return {
             "avg_generation_time": self.monitoring.get_metric_summary("generation_time"),
