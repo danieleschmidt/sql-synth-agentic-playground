@@ -14,7 +14,7 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 import numpy as np
 from scipy import stats
@@ -39,12 +39,12 @@ class ExperimentConfig:
     name: str
     description: str
     dataset_name: str
-    models_to_compare: List[str]
-    evaluation_metrics: List[MetricType]
+    models_to_compare: list[str]
+    evaluation_metrics: list[MetricType]
     sample_size: Optional[int] = None
     random_seed: int = 42
     timeout_seconds: int = 30
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -60,7 +60,7 @@ class QueryResult:
     execution_time: float
     success: bool
     error_message: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -73,9 +73,9 @@ class ModelPerformance:
     execution_accuracy_score: float
     avg_generation_time: float
     avg_execution_time: float
-    complexity_scores: List[float]
-    error_types: Dict[str, int]
-    confidence_intervals: Dict[str, Tuple[float, float]]
+    complexity_scores: list[float]
+    error_types: dict[str, int]
+    confidence_intervals: dict[str, tuple[float, float]]
 
 
 class DatasetLoader:
@@ -86,10 +86,11 @@ class DatasetLoader:
         self.supported_datasets = ["spider", "wikisql", "synthetic_benchmark"]
 
     def load_dataset(self, dataset_name: str, split: str = "test",
-                    sample_size: Optional[int] = None) -> List[Dict[str, Any]]:
+                    sample_size: Optional[int] = None) -> list[dict[str, Any]]:
         """Load a dataset split."""
         if dataset_name not in self.supported_datasets:
-            raise ValueError(f"Unsupported dataset: {dataset_name}")
+            msg = f"Unsupported dataset: {dataset_name}"
+            raise ValueError(msg)
 
         dataset_path = self.data_dir / dataset_name / f"{split}.json"
 
@@ -107,7 +108,7 @@ class DatasetLoader:
         logger.info("Loaded %d examples from %s/%s", len(data), dataset_name, split)
         return data
 
-    def _create_synthetic_dataset(self, size: int) -> List[Dict[str, Any]]:
+    def _create_synthetic_dataset(self, size: int) -> list[dict[str, Any]]:
         """Create synthetic dataset for testing."""
         synthetic_data = []
 
@@ -202,12 +203,11 @@ class SQLAccuracyEvaluator:
             normalized = normalized[:-1]
         return normalized
 
-    def _tokenize_sql(self, sql: str) -> List[str]:
+    def _tokenize_sql(self, sql: str) -> list[str]:
         """Simple SQL tokenization."""
         import re
         # Very basic tokenization - would need proper SQL parser for production
-        tokens = re.findall(r"\b\w+\b", sql.upper())
-        return tokens
+        return re.findall(r"\b\w+\b", sql.upper())
 
 
 class StatisticalAnalyzer:
@@ -217,7 +217,7 @@ class StatisticalAnalyzer:
         self.confidence_level = confidence_level
         self.alpha = 1 - confidence_level
 
-    def compare_models(self, model_results: Dict[str, List[float]]) -> Dict[str, Any]:
+    def compare_models(self, model_results: dict[str, list[float]]) -> dict[str, Any]:
         """Compare multiple models using statistical tests."""
         results = {
             "model_comparisons": {},
@@ -242,7 +242,7 @@ class StatisticalAnalyzer:
         # Pairwise t-tests
         model_names = list(model_results.keys())
         for i, model1 in enumerate(model_names):
-            for j, model2 in enumerate(model_names[i+1:], i+1):
+            for _j, model2 in enumerate(model_names[i+1:], i+1):
                 try:
                     t_stat, p_value = stats.ttest_ind(
                         model_results[model1],
@@ -268,7 +268,7 @@ class StatisticalAnalyzer:
 
         return results
 
-    def calculate_confidence_interval(self, values: List[float]) -> Tuple[float, float]:
+    def calculate_confidence_interval(self, values: list[float]) -> tuple[float, float]:
         """Calculate confidence interval for a list of values."""
         if not values:
             return (0.0, 0.0)
@@ -285,7 +285,7 @@ class StatisticalAnalyzer:
         margin_of_error = t_critical * std_error
         return (mean - margin_of_error, mean + margin_of_error)
 
-    def _calculate_effect_size(self, group1: List[float], group2: List[float]) -> float:
+    def _calculate_effect_size(self, group1: list[float], group2: list[float]) -> float:
         """Calculate Cohen's d effect size."""
         if not group1 or not group2:
             return 0.0
@@ -326,7 +326,7 @@ class ExperimentRunner:
             "code-llama": self._mock_codellama_model,
         }
 
-    async def run_experiment(self, config: ExperimentConfig) -> Dict[str, Any]:
+    async def run_experiment(self, config: ExperimentConfig) -> dict[str, Any]:
         """Run a complete benchmarking experiment."""
         logger.info("Starting experiment: %s", config.name)
         start_time = time.time()
@@ -351,7 +351,7 @@ class ExperimentRunner:
             model_results[model_name] = model_performance
 
         # Statistical analysis
-        accuracy_scores = {
+        {
             model: perf.accuracy_score
             for model, perf in model_results.items()
         }
@@ -381,12 +381,11 @@ class ExperimentRunner:
         logger.info("Experiment completed in %.2f seconds", experiment_results["experiment_duration"])
         return experiment_results
 
-    async def _evaluate_model(self, model_name: str, dataset: List[Dict[str, Any]],
+    async def _evaluate_model(self, model_name: str, dataset: list[dict[str, Any]],
                             config: ExperimentConfig) -> ModelPerformance:
         """Evaluate a single model on the dataset."""
         model_func = self.available_models[model_name]
 
-        results = []
         successful_queries = 0
         accuracy_scores = []
         execution_accuracy_scores = []
@@ -396,7 +395,7 @@ class ExperimentRunner:
         error_types = {}
 
         for i, example in enumerate(dataset):
-            query_id = example.get("query_id", f"query_{i}")
+            example.get("query_id", f"query_{i}")
             natural_query = example["natural_query"]
             reference_sql = example.get("sql", "")
 
@@ -486,7 +485,7 @@ class ExperimentRunner:
 
         return min(complexity, 5.0)  # Cap at 5.0
 
-    async def _mock_execute_sql(self, sql: str) -> Optional[List[Dict[str, Any]]]:
+    async def _mock_execute_sql(self, sql: str) -> Optional[list[dict[str, Any]]]:
         """Mock SQL execution for testing."""
         if not sql or "ERROR" in sql.upper():
             return None
@@ -537,7 +536,7 @@ class ExperimentRunner:
             return "SELECT AVG(value) FROM data;"
         return "SELECT * FROM table1;"
 
-    def generate_report(self, experiment_results: Dict[str, Any]) -> str:
+    def generate_report(self, experiment_results: dict[str, Any]) -> str:
         """Generate a human-readable experiment report."""
         report = []
         report.append("# SQL Generation Benchmarking Report")
@@ -577,9 +576,9 @@ class ExperimentRunner:
 
 
 # Example usage and experiment configurations
-def create_benchmark_experiments() -> List[ExperimentConfig]:
+def create_benchmark_experiments() -> list[ExperimentConfig]:
     """Create standard benchmarking experiments."""
-    experiments = [
+    return [
         ExperimentConfig(
             experiment_id="accuracy_comparison_2024",
             name="SQL Generation Accuracy Comparison",
@@ -600,7 +599,6 @@ def create_benchmark_experiments() -> List[ExperimentConfig]:
         ),
     ]
 
-    return experiments
 
 
 # Global experiment runner instance

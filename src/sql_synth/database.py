@@ -103,7 +103,8 @@ class DatabaseManager:
         """
         if self._engine is None:
             if self.database_url is None:
-                raise ValueError("Database URL not configured")
+                msg = "Database URL not configured"
+                raise ValueError(msg)
 
             for attempt in range(1, self._max_connection_attempts + 1):
                 try:
@@ -151,8 +152,9 @@ class DatabaseManager:
                 except Exception as e:
                     logger.warning("Engine creation attempt %d failed: %s", attempt, str(e))
                     if attempt == self._max_connection_attempts:
-                        logger.error("Failed to create engine after %d attempts", self._max_connection_attempts)
-                        raise SQLAlchemyError(f"Engine creation failed after {self._max_connection_attempts} attempts: {e}") from e
+                        logger.exception("Failed to create engine after %d attempts", self._max_connection_attempts)
+                        msg = f"Engine creation failed after {self._max_connection_attempts} attempts: {e}"
+                        raise SQLAlchemyError(msg) from e
                     time.sleep(self._connection_retry_delay)
 
         return self._engine
@@ -221,19 +223,20 @@ class DatabaseManager:
             Dictionary containing dialect information
         """
         if self.db_type is None:
-            raise ValueError("Database type not configured")
+            msg = "Database type not configured"
+            raise ValueError(msg)
         return self.DIALECT_INFO[self.db_type].copy()
 
     @contextmanager
     def get_connection(self, autocommit: bool = True):
         """Context manager for database connections with automatic cleanup.
-        
+
         Args:
             autocommit: Whether to automatically commit transactions
-            
+
         Yields:
             SQLAlchemy Connection object
-            
+
         Raises:
             SQLAlchemyError: If connection fails
         """
@@ -257,9 +260,9 @@ class DatabaseManager:
                     transaction.rollback()
                     logger.info("Transaction rolled back due to error")
                 except Exception as rollback_error:
-                    logger.error("Failed to rollback transaction: %s", rollback_error)
+                    logger.exception("Failed to rollback transaction: %s", rollback_error)
 
-            logger.error("Database operation failed: %s", str(e))
+            logger.exception("Database operation failed: %s", str(e))
             raise
 
         finally:
@@ -271,12 +274,12 @@ class DatabaseManager:
 
     def execute_query_safely(self, query: str, parameters: Optional[dict] = None, limit: Optional[int] = None) -> dict[str, Any]:
         """Execute a query safely with error handling and limits.
-        
+
         Args:
             query: SQL query to execute
             parameters: Query parameters for safe execution
             limit: Maximum number of rows to return
-            
+
         Returns:
             Dictionary with query results and metadata
         """
@@ -319,7 +322,7 @@ class DatabaseManager:
 
         except (SQLAlchemyError, DisconnectionError, TimeoutError) as e:
             execution_time = time.time() - start_time
-            logger.error("SQL execution failed after %.3fs: %s", execution_time, str(e))
+            logger.exception("SQL execution failed after %.3fs: %s", execution_time, str(e))
 
             return {
                 "success": False,
@@ -331,7 +334,7 @@ class DatabaseManager:
             }
         except Exception as e:
             execution_time = time.time() - start_time
-            logger.error("Unexpected error during query execution after %.3fs: %s", execution_time, str(e))
+            logger.exception("Unexpected error during query execution after %.3fs: %s", execution_time, str(e))
 
             return {
                 "success": False,
@@ -344,7 +347,7 @@ class DatabaseManager:
 
     def get_connection_stats(self) -> dict[str, Any]:
         """Get connection pool statistics.
-        
+
         Returns:
             Dictionary with connection pool information
         """
@@ -372,7 +375,7 @@ class DatabaseManager:
                 self._engine.dispose()
                 logger.info("Database engine disposed successfully")
             except Exception as e:
-                logger.error("Error disposing database engine: %s", str(e))
+                logger.exception("Error disposing database engine: %s", str(e))
             finally:
                 self._engine = None
 

@@ -12,7 +12,7 @@ import threading
 from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -151,7 +151,7 @@ class LRUCache:
 
             return len(expired_keys)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics."""
         with self._lock:
             total_requests = self._hits + self._misses
@@ -186,32 +186,32 @@ class QueryCache:
         key_hash = hashlib.sha256(key_data.encode()).hexdigest()[:16]  # Use SHA-256 instead of MD5
         return f"{prefix}:{key_hash}"
 
-    def get_query_result(self, sql_query: str, parameters: Optional[Dict] = None) -> Optional[Dict[str, Any]]:
+    def get_query_result(self, sql_query: str, parameters: Optional[dict] = None) -> Optional[dict[str, Any]]:
         """Get cached query result."""
         key = self._generate_key("query", sql=sql_query, params=parameters or {})
         return self.cache.get(key)
 
-    def put_query_result(self, sql_query: str, result: Dict[str, Any], parameters: Optional[Dict] = None, ttl: Optional[int] = None) -> None:
+    def put_query_result(self, sql_query: str, result: dict[str, Any], parameters: Optional[dict] = None, ttl: Optional[int] = None) -> None:
         """Cache query result."""
         key = self._generate_key("query", sql=sql_query, params=parameters or {})
         self.cache.put(key, result, ttl)
 
-    def get_schema_info(self, database_url: str, table_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    def get_schema_info(self, database_url: str, table_name: Optional[str] = None) -> Optional[dict[str, Any]]:
         """Get cached schema information."""
         key = self._generate_key("schema", db=database_url, table=table_name or "all")
         return self.schema_cache.get(key)
 
-    def put_schema_info(self, database_url: str, schema_info: Dict[str, Any], table_name: Optional[str] = None) -> None:
+    def put_schema_info(self, database_url: str, schema_info: dict[str, Any], table_name: Optional[str] = None) -> None:
         """Cache schema information."""
         key = self._generate_key("schema", db=database_url, table=table_name or "all")
         self.schema_cache.put(key, schema_info)
 
-    def get_sql_generation(self, natural_language_query: str, database_context: str) -> Optional[Dict[str, Any]]:
+    def get_sql_generation(self, natural_language_query: str, database_context: str) -> Optional[dict[str, Any]]:
         """Get cached SQL generation result."""
         key = self._generate_key("generation", query=natural_language_query, context=database_context)
         return self.generation_cache.get(key)
 
-    def put_sql_generation(self, natural_language_query: str, database_context: str, result: Dict[str, Any], ttl: Optional[int] = None) -> None:
+    def put_sql_generation(self, natural_language_query: str, database_context: str, result: dict[str, Any], ttl: Optional[int] = None) -> None:
         """Cache SQL generation result."""
         key = self._generate_key("generation", query=natural_language_query, context=database_context)
         self.generation_cache.put(key, result, ttl)
@@ -235,7 +235,7 @@ class QueryCache:
 
             logger.info("Invalidated %d schema cache entries for database", len(keys_to_remove))
 
-    def warm_cache(self, common_queries: List[Tuple[str, Dict[str, Any]]]) -> None:
+    def warm_cache(self, common_queries: list[tuple[str, dict[str, Any]]]) -> None:
         """Pre-populate cache with common queries."""
         logger.info("Warming cache with %d common queries", len(common_queries))
 
@@ -246,7 +246,7 @@ class QueryCache:
 
         logger.info("Cache warming completed")
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """Get comprehensive cache statistics."""
         return {
             "query_cache": self.cache.get_stats(),
@@ -254,7 +254,7 @@ class QueryCache:
             "generation_cache": self.generation_cache.get_stats(),
         }
 
-    def cleanup_all(self) -> Dict[str, int]:
+    def cleanup_all(self) -> dict[str, int]:
         """Clean up expired entries from all caches."""
         return {
             "query_expired": self.cache.cleanup_expired(),
@@ -302,11 +302,11 @@ class CacheManager:
                 self._shutdown_event.wait(self._cleanup_interval)
 
             except Exception as e:
-                logger.error("Error in cache cleanup worker: %s", str(e))
+                logger.exception("Error in cache cleanup worker: %s", str(e))
                 # Wait before retrying
                 self._shutdown_event.wait(60)
 
-    def get_comprehensive_stats(self) -> Dict[str, Any]:
+    def get_comprehensive_stats(self) -> dict[str, Any]:
         """Get comprehensive cache statistics."""
         stats = self.query_cache.get_cache_stats()
 
@@ -340,7 +340,7 @@ def get_cache_manager() -> CacheManager:
 def cache_query_result(ttl: int = 3600):
     """Decorator to cache query results."""
     def decorator(func):
-        def wrapper(self, sql_query: str, parameters: Optional[Dict] = None, **kwargs):
+        def wrapper(self, sql_query: str, parameters: Optional[dict] = None, **kwargs):
             # Try to get from cache first
             cached_result = cache_manager.query_cache.get_query_result(sql_query, parameters)
             if cached_result is not None:

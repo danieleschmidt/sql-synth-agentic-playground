@@ -13,9 +13,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
-import numpy as np
 from scipy import stats
 
 logger = logging.getLogger(__name__)
@@ -23,135 +22,135 @@ logger = logging.getLogger(__name__)
 
 class IntelligentDiscovery:
     """Autonomous research opportunity discovery system."""
-    
+
     def __init__(self):
         self.discovery_patterns = {
-            'performance_bottlenecks': self._identify_performance_patterns,
-            'accuracy_improvements': self._identify_accuracy_patterns,
-            'novel_algorithms': self._identify_algorithmic_patterns,
-            'optimization_opportunities': self._identify_optimization_patterns
+            "performance_bottlenecks": self._identify_performance_patterns,
+            "accuracy_improvements": self._identify_accuracy_patterns,
+            "novel_algorithms": self._identify_algorithmic_patterns,
+            "optimization_opportunities": self._identify_optimization_patterns,
         }
-        
-    def discover_research_opportunities(self, metrics_history: List[Dict]) -> List[Dict]:
+
+    def discover_research_opportunities(self, metrics_history: list[dict]) -> list[dict]:
         """Automatically discover research opportunities from metrics."""
         opportunities = []
-        
+
         for pattern_name, detector in self.discovery_patterns.items():
             try:
                 found_opportunities = detector(metrics_history)
                 for opp in found_opportunities:
-                    opp['discovery_method'] = pattern_name
-                    opp['confidence'] = self._calculate_confidence(opp, metrics_history)
+                    opp["discovery_method"] = pattern_name
+                    opp["confidence"] = self._calculate_confidence(opp, metrics_history)
                 opportunities.extend(found_opportunities)
             except Exception as e:
                 logger.warning(f"Discovery pattern {pattern_name} failed: {e}")
-                
-        return sorted(opportunities, key=lambda x: x.get('confidence', 0), reverse=True)
-    
-    def _identify_performance_patterns(self, metrics: List[Dict]) -> List[Dict]:
+
+        return sorted(opportunities, key=lambda x: x.get("confidence", 0), reverse=True)
+
+    def _identify_performance_patterns(self, metrics: list[dict]) -> list[dict]:
         """Identify performance optimization opportunities."""
         opportunities = []
-        
+
         # Analyze response time trends
-        response_times = [m.get('response_time', 0) for m in metrics[-50:]]
+        response_times = [m.get("response_time", 0) for m in metrics[-50:]]
         if len(response_times) >= 10:
             trend_slope = self._calculate_trend(response_times)
             if trend_slope > 0.1:  # Degrading performance
                 opportunities.append({
-                    'type': 'performance_degradation',
-                    'description': 'Response time degradation detected',
-                    'potential_impact': 'High',
-                    'recommended_action': 'Implement adaptive caching and query optimization'
+                    "type": "performance_degradation",
+                    "description": "Response time degradation detected",
+                    "potential_impact": "High",
+                    "recommended_action": "Implement adaptive caching and query optimization",
                 })
-        
+
         # Analyze memory usage patterns
-        memory_usage = [m.get('memory_usage', 0) for m in metrics[-30:]]
+        memory_usage = [m.get("memory_usage", 0) for m in metrics[-30:]]
         if memory_usage and max(memory_usage) > 0.8:  # >80% memory usage
             opportunities.append({
-                'type': 'memory_optimization',
-                'description': 'High memory usage detected',
-                'potential_impact': 'Medium',
-                'recommended_action': 'Implement memory pooling and garbage collection optimization'
+                "type": "memory_optimization",
+                "description": "High memory usage detected",
+                "potential_impact": "Medium",
+                "recommended_action": "Implement memory pooling and garbage collection optimization",
             })
-            
+
         return opportunities
-    
-    def _identify_accuracy_patterns(self, metrics: List[Dict]) -> List[Dict]:
-        """Identify accuracy improvement opportunities.""" 
+
+    def _identify_accuracy_patterns(self, metrics: list[dict]) -> list[dict]:
+        """Identify accuracy improvement opportunities."""
         opportunities = []
-        
-        accuracy_scores = [m.get('accuracy_score', 0) for m in metrics[-100:]]
+
+        accuracy_scores = [m.get("accuracy_score", 0) for m in metrics[-100:]]
         if len(accuracy_scores) >= 20:
             avg_accuracy = statistics.mean(accuracy_scores)
             if avg_accuracy < 0.9:  # <90% accuracy
                 opportunities.append({
-                    'type': 'accuracy_improvement',
-                    'description': f'Average accuracy {avg_accuracy:.2%} below target',
-                    'potential_impact': 'High',
-                    'recommended_action': 'Implement ensemble methods and advanced prompt engineering'
+                    "type": "accuracy_improvement",
+                    "description": f"Average accuracy {avg_accuracy:.2%} below target",
+                    "potential_impact": "High",
+                    "recommended_action": "Implement ensemble methods and advanced prompt engineering",
                 })
-                
+
         return opportunities
-    
-    def _identify_algorithmic_patterns(self, metrics: List[Dict]) -> List[Dict]:
+
+    def _identify_algorithmic_patterns(self, metrics: list[dict]) -> list[dict]:
         """Identify novel algorithm opportunities."""
         opportunities = []
-        
+
         # Look for complex query patterns that could benefit from new approaches
-        query_complexities = [m.get('query_complexity', 'simple') for m in metrics[-50:]]
-        complex_ratio = sum(1 for c in query_complexities if c == 'complex') / len(query_complexities)
-        
+        query_complexities = [m.get("query_complexity", "simple") for m in metrics[-50:]]
+        complex_ratio = sum(1 for c in query_complexities if c == "complex") / len(query_complexities)
+
         if complex_ratio > 0.3:  # >30% complex queries
             opportunities.append({
-                'type': 'algorithm_enhancement',
-                'description': 'High complex query ratio suggests need for specialized algorithms',
-                'potential_impact': 'High', 
-                'recommended_action': 'Research graph-based query planning and neural SQL synthesis'
+                "type": "algorithm_enhancement",
+                "description": "High complex query ratio suggests need for specialized algorithms",
+                "potential_impact": "High",
+                "recommended_action": "Research graph-based query planning and neural SQL synthesis",
             })
-            
+
         return opportunities
-    
-    def _identify_optimization_patterns(self, metrics: List[Dict]) -> List[Dict]:
+
+    def _identify_optimization_patterns(self, metrics: list[dict]) -> list[dict]:
         """Identify general optimization opportunities."""
         opportunities = []
-        
+
         # Cache hit rate analysis
-        cache_hits = [m.get('cache_hit_rate', 0) for m in metrics[-50:]]
+        cache_hits = [m.get("cache_hit_rate", 0) for m in metrics[-50:]]
         if cache_hits and statistics.mean(cache_hits) < 0.7:  # <70% cache hit rate
             opportunities.append({
-                'type': 'caching_optimization',
-                'description': 'Low cache hit rate detected',
-                'potential_impact': 'Medium',
-                'recommended_action': 'Implement intelligent cache warming and predictive prefetching'
+                "type": "caching_optimization",
+                "description": "Low cache hit rate detected",
+                "potential_impact": "Medium",
+                "recommended_action": "Implement intelligent cache warming and predictive prefetching",
             })
-            
+
         return opportunities
-    
-    def _calculate_trend(self, values: List[float]) -> float:
+
+    def _calculate_trend(self, values: list[float]) -> float:
         """Calculate linear trend slope."""
         if len(values) < 2:
             return 0
         x = list(range(len(values)))
         slope, _, _, _, _ = stats.linregress(x, values)
         return slope
-    
-    def _calculate_confidence(self, opportunity: Dict, metrics: List[Dict]) -> float:
+
+    def _calculate_confidence(self, opportunity: dict, metrics: list[dict]) -> float:
         """Calculate confidence score for discovered opportunity."""
         base_confidence = 0.5
-        
+
         # Adjust based on data quality
         if len(metrics) >= 100:
             base_confidence += 0.2
         elif len(metrics) >= 50:
             base_confidence += 0.1
-            
+
         # Adjust based on impact
-        impact = opportunity.get('potential_impact', 'Low')
-        if impact == 'High':
+        impact = opportunity.get("potential_impact", "Low")
+        if impact == "High":
             base_confidence += 0.2
-        elif impact == 'Medium':
+        elif impact == "Medium":
             base_confidence += 0.1
-            
+
         return min(base_confidence, 1.0)
 
 
@@ -172,13 +171,13 @@ class ResearchHypothesis:
     hypothesis_id: str
     title: str
     description: str
-    success_metrics: List[str]
+    success_metrics: list[str]
     baseline_approach: str
     novel_approach: str
     expected_improvement: float
     confidence_threshold: float = 0.95
     significance_level: float = 0.05
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -188,11 +187,11 @@ class ExperimentResult:
     approach_name: str
     hypothesis_id: str
     timestamp: float
-    metrics: Dict[str, float]
+    metrics: dict[str, float]
     execution_time: float
     success: bool
     error_message: Optional[str] = None
-    context: Dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -201,11 +200,11 @@ class BenchmarkDataset:
     dataset_id: str
     name: str
     description: str
-    queries: List[Dict[str, Any]]
-    expected_results: List[Dict[str, Any]]
+    queries: list[dict[str, Any]]
+    expected_results: list[dict[str, Any]]
     difficulty_level: str  # easy, medium, hard, expert
     domain: str  # e-commerce, finance, healthcare, etc.
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class AlgorithmicApproach:
@@ -214,25 +213,26 @@ class AlgorithmicApproach:
     def __init__(self, name: str, description: str) -> None:
         self.name = name
         self.description = description
-        self.configuration: Dict[str, Any] = {}
+        self.configuration: dict[str, Any] = {}
 
     def configure(self, **kwargs) -> None:
         """Configure the approach with parameters."""
         self.configuration.update(kwargs)
 
-    def generate_sql(self, natural_query: str, context: Optional[Dict] = None) -> Dict[str, Any]:
+    def generate_sql(self, natural_query: str, context: Optional[dict] = None) -> dict[str, Any]:
         """Generate SQL using this approach.
-        
+
         Args:
             natural_query: Natural language query
             context: Optional context information
-            
+
         Returns:
             Dictionary with SQL and metadata
         """
-        raise NotImplementedError("Subclasses must implement generate_sql")
+        msg = "Subclasses must implement generate_sql"
+        raise NotImplementedError(msg)
 
-    def get_approach_metadata(self) -> Dict[str, Any]:
+    def get_approach_metadata(self) -> dict[str, Any]:
         """Get metadata about this approach."""
         return {
             "name": self.name,
@@ -250,7 +250,7 @@ class BaselineApproach(AlgorithmicApproach):
             description="Standard LangChain SQL agent with OpenAI GPT",
         )
 
-    def generate_sql(self, natural_query: str, context: Optional[Dict] = None) -> Dict[str, Any]:
+    def generate_sql(self, natural_query: str, context: Optional[dict] = None) -> dict[str, Any]:
         """Generate SQL using baseline approach."""
         # This would integrate with the existing SQL agent
         start_time = time.time()
@@ -281,7 +281,7 @@ class NovelApproach(AlgorithmicApproach):
         )
         self.improvement_type = improvement_type
 
-    def generate_sql(self, natural_query: str, context: Optional[Dict] = None) -> Dict[str, Any]:
+    def generate_sql(self, natural_query: str, context: Optional[dict] = None) -> dict[str, Any]:
         """Generate SQL using novel approach."""
         start_time = time.time()
 
@@ -316,7 +316,7 @@ class NovelApproach(AlgorithmicApproach):
             },
         }
 
-    def _generate_with_semantic_analysis(self, query: str, context: Optional[Dict]) -> str:
+    def _generate_with_semantic_analysis(self, query: str, context: Optional[dict]) -> str:
         """Generate SQL with enhanced semantic analysis."""
         # Simulate semantic analysis improvements
         return f"""
@@ -331,7 +331,7 @@ class NovelApproach(AlgorithmicApproach):
         LIMIT 100;
         """.strip()
 
-    def _generate_with_context(self, query: str, context: Optional[Dict]) -> str:
+    def _generate_with_context(self, query: str, context: Optional[dict]) -> str:
         """Generate SQL with context awareness."""
         context_filters = []
         if context:
@@ -349,19 +349,19 @@ class NovelApproach(AlgorithmicApproach):
         LIMIT 100;
         """.strip()
 
-    def _generate_with_ensemble(self, query: str, context: Optional[Dict]) -> str:
+    def _generate_with_ensemble(self, query: str, context: Optional[dict]) -> str:
         """Generate SQL with multi-model ensemble."""
         return """
         WITH ensemble_results AS (
             SELECT *, 'model_1' as source FROM model1_predictions
             UNION ALL
             SELECT *, 'model_2' as source FROM model2_predictions
-            UNION ALL  
+            UNION ALL
             SELECT *, 'model_3' as source FROM model3_predictions
         ),
         weighted_results AS (
             SELECT *,
-                   CASE source 
+                   CASE source
                        WHEN 'model_1' THEN 0.4
                        WHEN 'model_2' THEN 0.35
                        WHEN 'model_3' THEN 0.25
@@ -382,23 +382,23 @@ class ExperimentRunner:
     def __init__(self, max_workers: int = 4) -> None:
         self.max_workers = max_workers
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
-        self.results: List[ExperimentResult] = []
+        self.results: list[ExperimentResult] = []
 
     def run_experiment(
         self,
         hypothesis: ResearchHypothesis,
-        approaches: List[AlgorithmicApproach],
+        approaches: list[AlgorithmicApproach],
         dataset: BenchmarkDataset,
         iterations: int = 10,
-    ) -> List[ExperimentResult]:
+    ) -> list[ExperimentResult]:
         """Run comparative experiment across approaches.
-        
+
         Args:
             hypothesis: Research hypothesis being tested
             approaches: List of approaches to compare
             dataset: Benchmark dataset to use
             iterations: Number of iterations per approach
-            
+
         Returns:
             List of experiment results
         """
@@ -430,7 +430,7 @@ class ExperimentRunner:
                 experiment_results.append(result)
                 self.results.append(result)
             except Exception as e:
-                logger.error(f"Experiment failed: {e}")
+                logger.exception(f"Experiment failed: {e}")
 
         logger.info(f"Completed {len(experiment_results)} experiments")
         return experiment_results
@@ -439,8 +439,8 @@ class ExperimentRunner:
         self,
         hypothesis_id: str,
         approach: AlgorithmicApproach,
-        query_data: Dict[str, Any],
-        expected_result: Dict[str, Any],
+        query_data: dict[str, Any],
+        expected_result: dict[str, Any],
         iteration: int,
         query_idx: int,
     ) -> ExperimentResult:
@@ -492,10 +492,10 @@ class ExperimentRunner:
 
     def _calculate_metrics(
         self,
-        generation_result: Dict[str, Any],
-        expected_result: Dict[str, Any],
-        query_data: Dict[str, Any],
-    ) -> Dict[str, float]:
+        generation_result: dict[str, Any],
+        expected_result: dict[str, Any],
+        query_data: dict[str, Any],
+    ) -> dict[str, float]:
         """Calculate metrics for experiment result."""
         metrics = {}
 
@@ -543,7 +543,7 @@ class ExperimentRunner:
 
         return len(intersection) / len(union) if union else 1.0
 
-    def _calculate_semantic_correctness(self, generated: str, expected_result: Dict) -> float:
+    def _calculate_semantic_correctness(self, generated: str, expected_result: dict) -> float:
         """Calculate semantic correctness score."""
         # Simplified semantic analysis
         score = 0.5  # Base score
@@ -613,15 +613,15 @@ class StatisticalAnalyzer:
 
     def analyze_experimental_results(
         self,
-        results: List[ExperimentResult],
+        results: list[ExperimentResult],
         hypothesis: ResearchHypothesis,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Perform comprehensive statistical analysis of experimental results.
-        
+
         Args:
             results: List of experiment results
             hypothesis: Research hypothesis being tested
-            
+
         Returns:
             Statistical analysis report
         """
@@ -661,10 +661,10 @@ class StatisticalAnalyzer:
 
     def _analyze_metric(
         self,
-        approaches: Dict[str, List[ExperimentResult]],
+        approaches: dict[str, list[ExperimentResult]],
         metric: str,
         hypothesis: ResearchHypothesis,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Analyze a specific metric across approaches."""
         metric_data = {}
 
@@ -714,7 +714,7 @@ class StatisticalAnalyzer:
             ),
         }
 
-    def _perform_significance_tests(self, metric_data: Dict[str, List[float]]) -> Dict[str, Any]:
+    def _perform_significance_tests(self, metric_data: dict[str, list[float]]) -> dict[str, Any]:
         """Perform statistical significance tests."""
         tests = {}
 
@@ -759,7 +759,7 @@ class StatisticalAnalyzer:
 
         return tests
 
-    def _calculate_effect_sizes(self, metric_data: Dict[str, List[float]]) -> Dict[str, float]:
+    def _calculate_effect_sizes(self, metric_data: dict[str, list[float]]) -> dict[str, float]:
         """Calculate effect sizes (Cohen's d) for pairwise comparisons."""
         effect_sizes = {}
         approach_names = list(metric_data.keys())
@@ -796,10 +796,10 @@ class StatisticalAnalyzer:
 
     def _calculate_improvement_magnitude(
         self,
-        descriptive_stats: Dict[str, Dict],
+        descriptive_stats: dict[str, dict],
         baseline_approach: str,
         novel_approach: str,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Calculate improvement magnitude of novel approach over baseline."""
         if baseline_approach not in descriptive_stats or novel_approach not in descriptive_stats:
             return {"error": "Required approaches not found in data"}
@@ -835,9 +835,9 @@ class StatisticalAnalyzer:
 
     def _validate_hypothesis(
         self,
-        analysis_results: Dict[str, Any],
+        analysis_results: dict[str, Any],
         hypothesis: ResearchHypothesis,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Validate the research hypothesis based on analysis results."""
         validation_results = {
             "hypothesis_supported": False,
@@ -915,21 +915,21 @@ class ResearchManager:
 
         self.experiment_runner = ExperimentRunner()
         self.statistical_analyzer = StatisticalAnalyzer()
-        self.research_history: List[Dict[str, Any]] = []
+        self.research_history: list[dict[str, Any]] = []
 
     def conduct_research_study(
         self,
         hypothesis: ResearchHypothesis,
-        benchmark_datasets: List[BenchmarkDataset],
+        benchmark_datasets: list[BenchmarkDataset],
         iterations: int = 10,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Conduct a complete research study.
-        
+
         Args:
             hypothesis: Research hypothesis to test
             benchmark_datasets: List of benchmark datasets
             iterations: Number of iterations per experiment
-            
+
         Returns:
             Comprehensive research study results
         """
@@ -1003,10 +1003,10 @@ class ResearchManager:
     def _generate_reproducibility_info(
         self,
         hypothesis: ResearchHypothesis,
-        approaches: List[AlgorithmicApproach],
-        datasets: List[BenchmarkDataset],
+        approaches: list[AlgorithmicApproach],
+        datasets: list[BenchmarkDataset],
         iterations: int,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate information needed for reproducing the study."""
         return {
             "hypothesis_configuration": {
@@ -1042,8 +1042,8 @@ class ResearchManager:
     def _generate_publication_summary(
         self,
         hypothesis: ResearchHypothesis,
-        analysis: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        analysis: dict[str, Any],
+    ) -> dict[str, Any]:
         """Generate publication-ready summary."""
         validation = analysis.get("overall_validation", {})
 
@@ -1065,19 +1065,19 @@ class ResearchManager:
             },
         }
 
-    def _generate_abstract(self, hypothesis: ResearchHypothesis, validation: Dict[str, Any]) -> str:
+    def _generate_abstract(self, hypothesis: ResearchHypothesis, validation: dict[str, Any]) -> str:
         """Generate publication abstract."""
         support_status = "supported" if validation.get("hypothesis_supported", False) else "not supported"
         confidence = validation.get("confidence", 0.0)
 
         return f"""
-        This study investigates {hypothesis.description.lower()}. We hypothesized that {hypothesis.novel_approach} 
-        would outperform {hypothesis.baseline_approach} by at least {hypothesis.expected_improvement}% across key 
-        performance metrics. Through controlled experiments with statistical validation, we found that the hypothesis 
+        This study investigates {hypothesis.description.lower()}. We hypothesized that {hypothesis.novel_approach}
+        would outperform {hypothesis.baseline_approach} by at least {hypothesis.expected_improvement}% across key
+        performance metrics. Through controlled experiments with statistical validation, we found that the hypothesis
         was {support_status} with {confidence:.1%} confidence. {validation.get('overall_assessment', '')}
         """.strip()
 
-    def _extract_key_findings(self, analysis: Dict[str, Any]) -> List[str]:
+    def _extract_key_findings(self, analysis: dict[str, Any]) -> list[str]:
         """Extract key findings from analysis."""
         findings = []
 
@@ -1102,7 +1102,7 @@ class ResearchManager:
 
         return findings
 
-    def _suggest_future_work(self, hypothesis: ResearchHypothesis, validation: Dict[str, Any]) -> List[str]:
+    def _suggest_future_work(self, hypothesis: ResearchHypothesis, validation: dict[str, Any]) -> list[str]:
         """Suggest future research directions."""
         suggestions = [
             "Expand evaluation to larger and more diverse datasets",
@@ -1120,7 +1120,7 @@ class ResearchManager:
 
         return suggestions
 
-    def _save_study_results(self, study_results: Dict[str, Any]) -> None:
+    def _save_study_results(self, study_results: dict[str, Any]) -> None:
         """Save study results to file."""
         hypothesis_id = study_results["hypothesis"]["id"]
         timestamp = int(study_results["timestamp"])
@@ -1133,7 +1133,7 @@ class ResearchManager:
 
         logger.info(f"Study results saved to {filepath}")
 
-    def get_research_insights(self) -> Dict[str, Any]:
+    def get_research_insights(self) -> dict[str, Any]:
         """Get insights from all conducted research."""
         if not self.research_history:
             return {"message": "No research studies conducted yet"}
@@ -1237,7 +1237,7 @@ def create_sample_benchmark_dataset() -> BenchmarkDataset:
 global_research_manager = ResearchManager()
 
 # Example usage function
-def run_sample_research_study() -> Dict[str, Any]:
+def run_sample_research_study() -> dict[str, Any]:
     """Run a sample research study for demonstration."""
 
     # Define research hypothesis
@@ -1256,10 +1256,9 @@ def run_sample_research_study() -> Dict[str, Any]:
     benchmark_dataset = create_sample_benchmark_dataset()
 
     # Conduct research study
-    study_results = global_research_manager.conduct_research_study(
+    return global_research_manager.conduct_research_study(
         hypothesis=hypothesis,
         benchmark_datasets=[benchmark_dataset],
         iterations=5,
     )
 
-    return study_results

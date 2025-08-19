@@ -9,7 +9,7 @@ import threading
 import time
 from dataclasses import dataclass
 from threading import Lock, RLock
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Optional
 
 import psutil
 
@@ -28,7 +28,7 @@ class PerformanceMetrics:
     memory_usage_mb: float
     success: bool
     error_message: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: Optional[dict[str, Any]] = None
 
 
 @dataclass
@@ -50,8 +50,8 @@ class PerformanceProfiler:
 
     def __init__(self, max_history: int = 1000) -> None:
         self.max_history = max_history
-        self.metrics_history: List[PerformanceMetrics] = []
-        self.resource_history: List[ResourceUtilization] = []
+        self.metrics_history: list[PerformanceMetrics] = []
+        self.resource_history: list[ResourceUtilization] = []
         self._lock = Lock()
         self._last_network_io = None
         self._last_disk_io = None
@@ -60,7 +60,7 @@ class PerformanceProfiler:
 
     def start_monitoring(self, interval: float = 5.0) -> None:
         """Start continuous resource monitoring.
-        
+
         Args:
             interval: Monitoring interval in seconds
         """
@@ -89,15 +89,15 @@ class PerformanceProfiler:
         operation_type: str,
         *args,
         **kwargs,
-    ) -> Tuple[Any, PerformanceMetrics]:
+    ) -> tuple[Any, PerformanceMetrics]:
         """Profile a function execution with detailed metrics.
-        
+
         Args:
             func: Function to profile
             operation_type: Type of operation being profiled
             *args: Function arguments
             **kwargs: Function keyword arguments
-            
+
         Returns:
             Tuple of (function result, performance metrics)
         """
@@ -217,12 +217,12 @@ class PerformanceProfiler:
             if len(self.resource_history) > self.max_history:
                 self.resource_history.pop(0)
 
-    def get_performance_summary(self, operation_type: Optional[str] = None) -> Dict[str, Any]:
+    def get_performance_summary(self, operation_type: Optional[str] = None) -> dict[str, Any]:
         """Get performance summary statistics.
-        
+
         Args:
             operation_type: Filter by specific operation type
-            
+
         Returns:
             Performance summary dictionary
         """
@@ -265,7 +265,7 @@ class PerformanceProfiler:
                 ],
             }
 
-    def get_resource_summary(self) -> Dict[str, Any]:
+    def get_resource_summary(self) -> dict[str, Any]:
         """Get resource utilization summary."""
         with self._lock:
             if not self.resource_history:
@@ -307,8 +307,8 @@ class ConnectionPoolManager:
         self.idle_timeout = idle_timeout
         self.scale_threshold = scale_threshold
 
-        self._pool: List[Any] = []
-        self._in_use: Set[Any] = set()
+        self._pool: list[Any] = []
+        self._in_use: set[Any] = set()
         self._lock = RLock()
         self._last_cleanup = time.time()
         self._connection_factory: Optional[Callable] = None
@@ -338,7 +338,8 @@ class ConnectionPoolManager:
             # Create new connection if under limit
             if len(self._in_use) < self.max_connections:
                 if not self._connection_factory:
-                    raise RuntimeError("No connection factory configured")
+                    msg = "No connection factory configured"
+                    raise RuntimeError(msg)
 
                 connection = self._connection_factory()
                 self._in_use.add(connection)
@@ -350,7 +351,8 @@ class ConnectionPoolManager:
                 return connection
 
             # Pool exhausted
-            raise RuntimeError(f"Connection pool exhausted (max: {self.max_connections})")
+            msg = f"Connection pool exhausted (max: {self.max_connections})"
+            raise RuntimeError(msg)
 
     def return_connection(self, connection: Any) -> None:
         """Return a connection to the pool."""
@@ -412,7 +414,7 @@ class ConnectionPoolManager:
             utilization = len(self._in_use) / max(1, len(self._pool) + len(self._in_use))
             return utilization > self.scale_threshold
 
-    def get_pool_stats(self) -> Dict[str, Any]:
+    def get_pool_stats(self) -> dict[str, Any]:
         """Get connection pool statistics."""
         with self._lock:
             return {
@@ -435,20 +437,20 @@ class QueryOptimizer:
             "optimize_joins": self._optimize_joins,
             "cache_suggestions": self._suggest_caching,
         }
-        self.query_cache: Dict[str, Dict[str, Any]] = {}
+        self.query_cache: dict[str, dict[str, Any]] = {}
         self._cache_lock = Lock()
 
     def optimize_query(
         self,
         sql_query: str,
-        execution_context: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        execution_context: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
         """Optimize SQL query with intelligent analysis.
-        
+
         Args:
             sql_query: Original SQL query
             execution_context: Context information for optimization
-            
+
         Returns:
             Optimization result with improved query and suggestions
         """
@@ -504,7 +506,7 @@ class QueryOptimizer:
 
         return result
 
-    def _add_limit_if_missing(self, query: str, context: Dict[str, Any]) -> Dict[str, Any]:
+    def _add_limit_if_missing(self, query: str, context: dict[str, Any]) -> dict[str, Any]:
         """Add LIMIT clause if missing."""
         query_upper = query.upper()
 
@@ -529,7 +531,7 @@ class QueryOptimizer:
 
         return {"query": query, "modified": False, "suggestions": []}
 
-    def _optimize_select_clause(self, query: str, context: Dict[str, Any]) -> Dict[str, Any]:
+    def _optimize_select_clause(self, query: str, context: dict[str, Any]) -> dict[str, Any]:
         """Optimize SELECT clause."""
         suggestions = []
 
@@ -541,7 +543,7 @@ class QueryOptimizer:
 
         return {"query": query, "modified": False, "suggestions": suggestions}
 
-    def _suggest_indexes(self, query: str, context: Dict[str, Any]) -> Dict[str, Any]:
+    def _suggest_indexes(self, query: str, context: dict[str, Any]) -> dict[str, Any]:
         """Suggest database indexes for better performance."""
         suggestions = []
         query_upper = query.upper()
@@ -567,7 +569,7 @@ class QueryOptimizer:
 
         return {"query": query, "modified": False, "suggestions": suggestions}
 
-    def _optimize_joins(self, query: str, context: Dict[str, Any]) -> Dict[str, Any]:
+    def _optimize_joins(self, query: str, context: dict[str, Any]) -> dict[str, Any]:
         """Optimize JOIN operations."""
         suggestions = []
         query_upper = query.upper()
@@ -588,7 +590,7 @@ class QueryOptimizer:
 
         return {"query": query, "modified": False, "suggestions": suggestions}
 
-    def _suggest_caching(self, query: str, context: Dict[str, Any]) -> Dict[str, Any]:
+    def _suggest_caching(self, query: str, context: dict[str, Any]) -> dict[str, Any]:
         """Suggest caching opportunities."""
         suggestions = []
         query_upper = query.upper()
@@ -609,7 +611,7 @@ class QueryOptimizer:
 
         return {"query": query, "modified": False, "suggestions": suggestions}
 
-    def _calculate_optimization_score(self, original: str, optimized: str, applied: List[str]) -> float:
+    def _calculate_optimization_score(self, original: str, optimized: str, applied: list[str]) -> float:
         """Calculate optimization score."""
         base_score = 0.7  # Base score for any query
 
@@ -629,10 +631,9 @@ class QueryOptimizer:
         # Penalty for complexity
         complexity_penalty = min(0.2, optimized.count("(") * 0.02)
 
-        final_score = min(1.0, base_score + optimization_bonus - complexity_penalty)
-        return final_score
+        return min(1.0, base_score + optimization_bonus - complexity_penalty)
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """Get query optimization cache statistics."""
         with self._cache_lock:
             return {
@@ -690,7 +691,7 @@ class AutoScalingManager:
             try:
                 self._evaluate_scaling_decision()
             except Exception as e:
-                logger.error(f"Auto-scaling evaluation error: {e}")
+                logger.exception(f"Auto-scaling evaluation error: {e}")
 
             time.sleep(self.scale_check_interval)
 
@@ -725,10 +726,9 @@ class AutoScalingManager:
             utilization < self.scale_down_threshold and
             cpu_usage < self.scale_down_threshold and
             memory_usage < self.scale_down_threshold
-        ):
-            if self._can_scale_down():
-                self._scale_down()
-                self._last_scale_action = current_time
+        ) and self._can_scale_down():
+            self._scale_down()
+            self._last_scale_action = current_time
 
     def _can_scale_up(self) -> bool:
         """Check if scaling up is possible."""
