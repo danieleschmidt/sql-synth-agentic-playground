@@ -1,0 +1,294 @@
+[
+  {
+    "scenario": "🇺🇸 US English Query",
+    "result": {
+      "sql_query": "SELECT /*+ USE_INDEX */ * FROM table;",
+      "detected_language": "en",
+      "sql_intent": {
+        "operation": "SELECT",
+        "target": "*",
+        "conditions": [],
+        "aggregations": [],
+        "joins": [],
+        "confidence": 0.6
+      },
+      "synthesis_time": 5.793571472167969e-05,
+      "global_intelligence": {
+        "region": "US",
+        "language": "en",
+        "compliance_frameworks": [],
+        "compliance_status": "compliant",
+        "regional_optimizations": {
+          "date_format": "MM/DD/YYYY",
+          "timezone": "America/New_York",
+          "performance_profile": "high_throughput"
+        }
+      },
+      "compliance_details": {
+        "compliant": true,
+        "frameworks": [],
+        "violations": [],
+        "recommendations": []
+      },
+      "i18n_support": {
+        "supported_languages": [
+          "en",
+          "es",
+          "fr",
+          "de",
+          "ja",
+          "zh",
+          "pt",
+          "it",
+          "ru",
+          "ar"
+        ],
+        "detected_patterns": {
+          "operation": "SELECT",
+          "target": "*",
+          "conditions": [],
+          "aggregations": [],
+          "joins": [],
+          "confidence": 0.6
+        },
+        "language_confidence": 0.6
+      }
+    }
+  },
+  {
+    "scenario": "🇪🇺 EU GDPR Query (German)",
+    "result": {
+      "sql_query": "SELECT /* AUDIT: compliance_query */ * FROM table;",
+      "detected_language": "de",
+      "sql_intent": {
+        "operation": "SELECT",
+        "target": "*",
+        "conditions": [],
+        "aggregations": [],
+        "joins": [],
+        "confidence": 0.6
+      },
+      "synthesis_time": 5.412101745605469e-05,
+      "global_intelligence": {
+        "region": "EU",
+        "language": "de",
+        "compliance_frameworks": [
+          "GDPR"
+        ],
+        "compliance_status": "compliant",
+        "regional_optimizations": {
+          "date_format": "DD/MM/YYYY",
+          "timezone": "Europe/London",
+          "performance_profile": "compliance_focused"
+        }
+      },
+      "compliance_details": {
+        "compliant": true,
+        "frameworks": [
+          "GDPR"
+        ],
+        "violations": [],
+        "recommendations": []
+      },
+      "i18n_support": {
+        "supported_languages": [
+          "en",
+          "es",
+          "fr",
+          "de",
+          "ja",
+          "zh",
+          "pt",
+          "it",
+          "ru",
+          "ar"
+        ],
+        "detected_patterns": {
+          "operation": "SELECT",
+          "target": "*",
+          "conditions": [],
+          "aggregations": [],
+          "joins": [],
+          "confidence": 0.6
+        },
+        "language_confidence": 0.6
+      }
+    }
+  },
+  {
+    "scenario": "🇫🇷 French Query with GDPR",
+    "result": {
+      "sql_query": "SELECT /* AUDIT: compliance_query */ COUNT(*) FROM table;",
+      "detected_language": "fr",
+      "sql_intent": {
+        "operation": "COUNT",
+        "target": "*",
+        "conditions": [],
+        "aggregations": [],
+        "joins": [],
+        "confidence": 0.7
+      },
+      "synthesis_time": 4.57763671875e-05,
+      "global_intelligence": {
+        "region": "EU",
+        "language": "fr",
+        "compliance_frameworks": [
+          "GDPR"
+        ],
+        "compliance_status": "compliant",
+        "regional_optimizations": {
+          "date_format": "DD/MM/YYYY",
+          "timezone": "Europe/London",
+          "performance_profile": "compliance_focused"
+        }
+      },
+      "compliance_details": {
+        "compliant": true,
+        "frameworks": [
+          "GDPR"
+        ],
+        "violations": [],
+        "recommendations": []
+      },
+      "i18n_support": {
+        "supported_languages": [
+          "en",
+          "es",
+          "fr",
+          "de",
+          "ja",
+          "zh",
+          "pt",
+          "it",
+          "ru",
+          "ar"
+        ],
+        "detected_patterns": {
+          "operation": "COUNT",
+          "target": "*",
+          "conditions": [],
+          "aggregations": [],
+          "joins": [],
+          "confidence": 0.7
+        },
+        "language_confidence": 0.7
+      }
+    }
+  },
+  {
+    "scenario": "🇸🇬 Singapore PDPA Query",
+    "result": {
+      "sql_query": "SELECT /*+ USE_INDEX */ * FROM table WHERE condition = 'value';",
+      "detected_language": "zh",
+      "sql_intent": {
+        "operation": "SELECT",
+        "target": "*",
+        "conditions": [
+          "condition"
+        ],
+        "aggregations": [],
+        "joins": [],
+        "confidence": 0.7
+      },
+      "synthesis_time": 4.1961669921875e-05,
+      "global_intelligence": {
+        "region": "SG",
+        "language": "zh",
+        "compliance_frameworks": [
+          "PDPA"
+        ],
+        "compliance_status": "compliant",
+        "regional_optimizations": {}
+      },
+      "compliance_details": {
+        "compliant": true,
+        "frameworks": [
+          "PDPA"
+        ],
+        "violations": [],
+        "recommendations": []
+      },
+      "i18n_support": {
+        "supported_languages": [
+          "en",
+          "es",
+          "fr",
+          "de",
+          "ja",
+          "zh",
+          "pt",
+          "it",
+          "ru",
+          "ar"
+        ],
+        "detected_patterns": {
+          "operation": "SELECT",
+          "target": "*",
+          "conditions": [
+            "condition"
+          ],
+          "aggregations": [],
+          "joins": [],
+          "confidence": 0.7
+        },
+        "language_confidence": 0.7
+      }
+    }
+  },
+  {
+    "scenario": "🇯🇵 Japanese Query (APAC Region)",
+    "result": {
+      "sql_query": "SELECT * FROM table;",
+      "detected_language": "ja",
+      "sql_intent": {
+        "operation": "SELECT",
+        "target": "*",
+        "conditions": [],
+        "aggregations": [],
+        "joins": [],
+        "confidence": 0.6
+      },
+      "synthesis_time": 4.792213439941406e-05,
+      "global_intelligence": {
+        "region": "APAC",
+        "language": "ja",
+        "compliance_frameworks": [],
+        "compliance_status": "compliant",
+        "regional_optimizations": {
+          "date_format": "YYYY/MM/DD",
+          "timezone": "Asia/Singapore",
+          "performance_profile": "scalable"
+        }
+      },
+      "compliance_details": {
+        "compliant": true,
+        "frameworks": [],
+        "violations": [],
+        "recommendations": []
+      },
+      "i18n_support": {
+        "supported_languages": [
+          "en",
+          "es",
+          "fr",
+          "de",
+          "ja",
+          "zh",
+          "pt",
+          "it",
+          "ru",
+          "ar"
+        ],
+        "detected_patterns": {
+          "operation": "SELECT",
+          "target": "*",
+          "conditions": [],
+          "aggregations": [],
+          "joins": [],
+          "confidence": 0.6
+        },
+        "language_confidence": 0.6
+      }
+    }
+  }
+]
