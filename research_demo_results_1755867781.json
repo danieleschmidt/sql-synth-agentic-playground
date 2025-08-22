@@ -1,0 +1,505 @@
+{
+  "benchmark_summary": {
+    "total_algorithms": 3,
+    "total_queries": 18,
+    "timestamp": 1755867781.6433196
+  },
+  "algorithm_metrics": {
+    "quantum_sql_synthesis": {
+      "total_queries": 6,
+      "successful_queries": 6,
+      "success_rate": 1.0,
+      "avg_synthesis_time": 0.10041419665018718,
+      "avg_quality_score": 0.7666666666666666
+    },
+    "neural_adaptive_engine": {
+      "total_queries": 6,
+      "successful_queries": 6,
+      "success_rate": 1.0,
+      "avg_synthesis_time": 0.08046519756317139,
+      "avg_quality_score": 0.6333333333333333
+    },
+    "classical_baseline": {
+      "total_queries": 6,
+      "successful_queries": 6,
+      "success_rate": 1.0,
+      "avg_synthesis_time": 5.4836273193359375e-06,
+      "avg_quality_score": 0.7666666666666666
+    }
+  },
+  "detailed_results": [
+    {
+      "algorithm_name": "quantum_sql_synthesis",
+      "query_id": "001_trial_0",
+      "natural_query": "Show all students",
+      "generated_sql": "SELECT * FROM table;",
+      "synthesis_time": 0.10038185119628906,
+      "quality_score": 0.8999999999999999,
+      "correctness": true,
+      "metadata": {
+        "sql_query": "SELECT * FROM table;",
+        "quantum_candidates": [
+          "SELECT * FROM table;",
+          "SELECT * FROM table ORDER BY id;",
+          "SELECT DISTINCT * FROM table;"
+        ],
+        "quantum_confidence": 1.0,
+        "synthesis_time": 0.15,
+        "quantum_advantage": 7.5,
+        "research_metrics": {
+          "superposition_size": 3,
+          "entanglement_degree": 2,
+          "coherence_preserved": 0.92,
+          "quantum_speedup": 3.2
+        }
+      }
+    },
+    {
+      "algorithm_name": "quantum_sql_synthesis",
+      "query_id": "001_trial_1",
+      "natural_query": "Show all students",
+      "generated_sql": "SELECT * FROM table;",
+      "synthesis_time": 0.10041546821594238,
+      "quality_score": 0.8999999999999999,
+      "correctness": true,
+      "metadata": {
+        "sql_query": "SELECT * FROM table;",
+        "quantum_candidates": [
+          "SELECT * FROM table;",
+          "SELECT * FROM table ORDER BY id;",
+          "SELECT DISTINCT * FROM table;"
+        ],
+        "quantum_confidence": 1.0,
+        "synthesis_time": 0.15,
+        "quantum_advantage": 7.5,
+        "research_metrics": {
+          "superposition_size": 3,
+          "entanglement_degree": 2,
+          "coherence_preserved": 0.92,
+          "quantum_speedup": 3.2
+        }
+      }
+    },
+    {
+      "algorithm_name": "quantum_sql_synthesis",
+      "query_id": "002_trial_0",
+      "natural_query": "Count the courses",
+      "generated_sql": "SELECT COUNT(*) FROM table;",
+      "synthesis_time": 0.10039734840393066,
+      "quality_score": 0.8999999999999999,
+      "correctness": true,
+      "metadata": {
+        "sql_query": "SELECT COUNT(*) FROM table;",
+        "quantum_candidates": [
+          "SELECT COUNT(*) FROM table;",
+          "SELECT COUNT(DISTINCT column) FROM table;",
+          "SELECT COUNT(1) FROM table;"
+        ],
+        "quantum_confidence": 1.0,
+        "synthesis_time": 0.15,
+        "quantum_advantage": 7.5,
+        "research_metrics": {
+          "superposition_size": 3,
+          "entanglement_degree": 2,
+          "coherence_preserved": 0.92,
+          "quantum_speedup": 3.2
+        }
+      }
+    },
+    {
+      "algorithm_name": "quantum_sql_synthesis",
+      "query_id": "002_trial_1",
+      "natural_query": "Count the courses",
+      "generated_sql": "SELECT COUNT(*) FROM table;",
+      "synthesis_time": 0.10044336318969727,
+      "quality_score": 0.8999999999999999,
+      "correctness": true,
+      "metadata": {
+        "sql_query": "SELECT COUNT(*) FROM table;",
+        "quantum_candidates": [
+          "SELECT COUNT(*) FROM table;",
+          "SELECT COUNT(DISTINCT column) FROM table;",
+          "SELECT COUNT(1) FROM table;"
+        ],
+        "quantum_confidence": 1.0,
+        "synthesis_time": 0.15,
+        "quantum_advantage": 7.5,
+        "research_metrics": {
+          "superposition_size": 3,
+          "entanglement_degree": 2,
+          "coherence_preserved": 0.92,
+          "quantum_speedup": 3.2
+        }
+      }
+    },
+    {
+      "algorithm_name": "quantum_sql_synthesis",
+      "query_id": "003_trial_0",
+      "natural_query": "Find students with high grades",
+      "generated_sql": "SELECT * FROM table WHERE condition = 'value';",
+      "synthesis_time": 0.10037875175476074,
+      "quality_score": 0.5,
+      "correctness": true,
+      "metadata": {
+        "sql_query": "SELECT * FROM table WHERE condition = 'value';",
+        "quantum_candidates": [
+          "SELECT * FROM table WHERE condition = 'value';",
+          "SELECT column FROM table WHERE condition IS NOT NULL;",
+          "SELECT DISTINCT column FROM table;"
+        ],
+        "quantum_confidence": 1.0,
+        "synthesis_time": 0.15,
+        "quantum_advantage": 7.5,
+        "research_metrics": {
+          "superposition_size": 3,
+          "entanglement_degree": 2,
+          "coherence_preserved": 0.92,
+          "quantum_speedup": 3.2
+        }
+      }
+    },
+    {
+      "algorithm_name": "quantum_sql_synthesis",
+      "query_id": "003_trial_1",
+      "natural_query": "Find students with high grades",
+      "generated_sql": "SELECT * FROM table WHERE condition = 'value';",
+      "synthesis_time": 0.10046839714050293,
+      "quality_score": 0.5,
+      "correctness": true,
+      "metadata": {
+        "sql_query": "SELECT * FROM table WHERE condition = 'value';",
+        "quantum_candidates": [
+          "SELECT * FROM table WHERE condition = 'value';",
+          "SELECT column FROM table WHERE condition IS NOT NULL;",
+          "SELECT DISTINCT column FROM table;"
+        ],
+        "quantum_confidence": 1.0,
+        "synthesis_time": 0.15,
+        "quantum_advantage": 7.5,
+        "research_metrics": {
+          "superposition_size": 3,
+          "entanglement_degree": 2,
+          "coherence_preserved": 0.92,
+          "quantum_speedup": 3.2
+        }
+      }
+    },
+    {
+      "algorithm_name": "neural_adaptive_engine",
+      "query_id": "001_trial_0",
+      "natural_query": "Show all students",
+      "generated_sql": "SELECT * FROM table WHERE condition = 'value';",
+      "synthesis_time": 0.08045387268066406,
+      "quality_score": 0.5,
+      "correctness": true,
+      "metadata": {
+        "sql_query": "SELECT * FROM table WHERE condition = 'value';",
+        "synthesis_time": 0.12,
+        "recognized_patterns": [
+          "SELECT_pattern",
+          "conditional_pattern"
+        ],
+        "meta_learning_confidence": 0.79,
+        "adaptation_metrics": {
+          "trigger_reason": "confidence_below_threshold",
+          "adaptations_applied": [
+            "weight_adjustment",
+            "learning_rate_tuning"
+          ],
+          "adaptation_count": 1
+        },
+        "research_insights": {
+          "pattern_count": 2,
+          "adaptation_triggered": true,
+          "meta_learning_accuracy": 0.87,
+          "architecture_evolution": {
+            "layer_count": 5,
+            "total_parameters": 12800,
+            "adaptation_count": 1
+          }
+        }
+      }
+    },
+    {
+      "algorithm_name": "neural_adaptive_engine",
+      "query_id": "001_trial_1",
+      "natural_query": "Show all students",
+      "generated_sql": "SELECT * FROM table WHERE condition = 'value';",
+      "synthesis_time": 0.08051562309265137,
+      "quality_score": 0.5,
+      "correctness": true,
+      "metadata": {
+        "sql_query": "SELECT * FROM table WHERE condition = 'value';",
+        "synthesis_time": 0.12,
+        "recognized_patterns": [
+          "SELECT_pattern",
+          "conditional_pattern"
+        ],
+        "meta_learning_confidence": 0.79,
+        "adaptation_metrics": {
+          "trigger_reason": "confidence_below_threshold",
+          "adaptations_applied": [
+            "weight_adjustment",
+            "learning_rate_tuning"
+          ],
+          "adaptation_count": 1
+        },
+        "research_insights": {
+          "pattern_count": 2,
+          "adaptation_triggered": true,
+          "meta_learning_accuracy": 0.87,
+          "architecture_evolution": {
+            "layer_count": 5,
+            "total_parameters": 12800,
+            "adaptation_count": 1
+          }
+        }
+      }
+    },
+    {
+      "algorithm_name": "neural_adaptive_engine",
+      "query_id": "002_trial_0",
+      "natural_query": "Count the courses",
+      "generated_sql": "SELECT COUNT(*) FROM table;",
+      "synthesis_time": 0.08056259155273438,
+      "quality_score": 0.8999999999999999,
+      "correctness": true,
+      "metadata": {
+        "sql_query": "SELECT COUNT(*) FROM table;",
+        "synthesis_time": 0.12,
+        "recognized_patterns": [
+          "SELECT_pattern",
+          "conditional_pattern"
+        ],
+        "meta_learning_confidence": 0.88,
+        "adaptation_metrics": {},
+        "research_insights": {
+          "pattern_count": 2,
+          "adaptation_triggered": false,
+          "meta_learning_accuracy": 0.87,
+          "architecture_evolution": {
+            "layer_count": 5,
+            "total_parameters": 12800,
+            "adaptation_count": 0
+          }
+        }
+      }
+    },
+    {
+      "algorithm_name": "neural_adaptive_engine",
+      "query_id": "002_trial_1",
+      "natural_query": "Count the courses",
+      "generated_sql": "SELECT COUNT(*) FROM table;",
+      "synthesis_time": 0.08036231994628906,
+      "quality_score": 0.8999999999999999,
+      "correctness": true,
+      "metadata": {
+        "sql_query": "SELECT COUNT(*) FROM table;",
+        "synthesis_time": 0.12,
+        "recognized_patterns": [
+          "SELECT_pattern",
+          "conditional_pattern"
+        ],
+        "meta_learning_confidence": 0.88,
+        "adaptation_metrics": {},
+        "research_insights": {
+          "pattern_count": 2,
+          "adaptation_triggered": false,
+          "meta_learning_accuracy": 0.87,
+          "architecture_evolution": {
+            "layer_count": 5,
+            "total_parameters": 12800,
+            "adaptation_count": 0
+          }
+        }
+      }
+    },
+    {
+      "algorithm_name": "neural_adaptive_engine",
+      "query_id": "003_trial_0",
+      "natural_query": "Find students with high grades",
+      "generated_sql": "SELECT * FROM table WHERE condition = 'value';",
+      "synthesis_time": 0.08043670654296875,
+      "quality_score": 0.5,
+      "correctness": true,
+      "metadata": {
+        "sql_query": "SELECT * FROM table WHERE condition = 'value';",
+        "synthesis_time": 0.12,
+        "recognized_patterns": [
+          "SELECT_pattern",
+          "conditional_pattern"
+        ],
+        "meta_learning_confidence": 0.79,
+        "adaptation_metrics": {
+          "trigger_reason": "confidence_below_threshold",
+          "adaptations_applied": [
+            "weight_adjustment",
+            "learning_rate_tuning"
+          ],
+          "adaptation_count": 1
+        },
+        "research_insights": {
+          "pattern_count": 2,
+          "adaptation_triggered": true,
+          "meta_learning_accuracy": 0.87,
+          "architecture_evolution": {
+            "layer_count": 5,
+            "total_parameters": 12800,
+            "adaptation_count": 1
+          }
+        }
+      }
+    },
+    {
+      "algorithm_name": "neural_adaptive_engine",
+      "query_id": "003_trial_1",
+      "natural_query": "Find students with high grades",
+      "generated_sql": "SELECT * FROM table WHERE condition = 'value';",
+      "synthesis_time": 0.0804600715637207,
+      "quality_score": 0.5,
+      "correctness": true,
+      "metadata": {
+        "sql_query": "SELECT * FROM table WHERE condition = 'value';",
+        "synthesis_time": 0.12,
+        "recognized_patterns": [
+          "SELECT_pattern",
+          "conditional_pattern"
+        ],
+        "meta_learning_confidence": 0.79,
+        "adaptation_metrics": {
+          "trigger_reason": "confidence_below_threshold",
+          "adaptations_applied": [
+            "weight_adjustment",
+            "learning_rate_tuning"
+          ],
+          "adaptation_count": 1
+        },
+        "research_insights": {
+          "pattern_count": 2,
+          "adaptation_triggered": true,
+          "meta_learning_accuracy": 0.87,
+          "architecture_evolution": {
+            "layer_count": 5,
+            "total_parameters": 12800,
+            "adaptation_count": 1
+          }
+        }
+      }
+    },
+    {
+      "algorithm_name": "classical_baseline",
+      "query_id": "001_trial_0",
+      "natural_query": "Show all students",
+      "generated_sql": "SELECT * FROM table;",
+      "synthesis_time": 1.8835067749023438e-05,
+      "quality_score": 0.8999999999999999,
+      "correctness": true,
+      "metadata": {
+        "sql_query": "SELECT * FROM table;",
+        "synthesis_time": 0.001,
+        "confidence": 0.6,
+        "method": "rule_based"
+      }
+    },
+    {
+      "algorithm_name": "classical_baseline",
+      "query_id": "001_trial_1",
+      "natural_query": "Show all students",
+      "generated_sql": "SELECT * FROM table;",
+      "synthesis_time": 4.0531158447265625e-06,
+      "quality_score": 0.8999999999999999,
+      "correctness": true,
+      "metadata": {
+        "sql_query": "SELECT * FROM table;",
+        "synthesis_time": 0.001,
+        "confidence": 0.6,
+        "method": "rule_based"
+      }
+    },
+    {
+      "algorithm_name": "classical_baseline",
+      "query_id": "002_trial_0",
+      "natural_query": "Count the courses",
+      "generated_sql": "SELECT COUNT(*) FROM table;",
+      "synthesis_time": 3.5762786865234375e-06,
+      "quality_score": 0.8999999999999999,
+      "correctness": true,
+      "metadata": {
+        "sql_query": "SELECT COUNT(*) FROM table;",
+        "synthesis_time": 0.001,
+        "confidence": 0.6,
+        "method": "rule_based"
+      }
+    },
+    {
+      "algorithm_name": "classical_baseline",
+      "query_id": "002_trial_1",
+      "natural_query": "Count the courses",
+      "generated_sql": "SELECT COUNT(*) FROM table;",
+      "synthesis_time": 2.6226043701171875e-06,
+      "quality_score": 0.8999999999999999,
+      "correctness": true,
+      "metadata": {
+        "sql_query": "SELECT COUNT(*) FROM table;",
+        "synthesis_time": 0.001,
+        "confidence": 0.6,
+        "method": "rule_based"
+      }
+    },
+    {
+      "algorithm_name": "classical_baseline",
+      "query_id": "003_trial_0",
+      "natural_query": "Find students with high grades",
+      "generated_sql": "SELECT * FROM table WHERE condition = 'value';",
+      "synthesis_time": 2.1457672119140625e-06,
+      "quality_score": 0.5,
+      "correctness": true,
+      "metadata": {
+        "sql_query": "SELECT * FROM table WHERE condition = 'value';",
+        "synthesis_time": 0.001,
+        "confidence": 0.6,
+        "method": "rule_based"
+      }
+    },
+    {
+      "algorithm_name": "classical_baseline",
+      "query_id": "003_trial_1",
+      "natural_query": "Find students with high grades",
+      "generated_sql": "SELECT * FROM table WHERE condition = 'value';",
+      "synthesis_time": 1.6689300537109375e-06,
+      "quality_score": 0.5,
+      "correctness": true,
+      "metadata": {
+        "sql_query": "SELECT * FROM table WHERE condition = 'value';",
+        "synthesis_time": 0.001,
+        "confidence": 0.6,
+        "method": "rule_based"
+      }
+    }
+  ],
+  "research_insights": {
+    "performance_leaders": {
+      "best_quality": {
+        "algorithm": "quantum_sql_synthesis",
+        "score": 0.7666666666666666
+      },
+      "fastest_synthesis": {
+        "algorithm": "classical_baseline",
+        "time": 5.4836273193359375e-06
+      }
+    },
+    "novel_algorithms": [
+      {
+        "algorithm": "quantum_sql_synthesis",
+        "type": "quantum",
+        "performance": 0.7666666666666666
+      },
+      {
+        "algorithm": "neural_adaptive_engine",
+        "type": "neural_adaptive",
+        "performance": 0.6333333333333333
+      }
+    ],
+    "breakthrough_findings": []
+  }
+}

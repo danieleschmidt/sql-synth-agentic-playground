@@ -1,8 +1,13 @@
-"""Global Intelligence System for comprehensive international support.
+"""Global Intelligence System for Multi-region SQL Synthesis.
 
-This module implements advanced global-first capabilities including:
-- Multi-language natural language processing
-- Cultural context adaptation
+This module implements global intelligence capabilities including multi-language support,
+regional compliance, and cross-cultural SQL synthesis patterns.
+
+Components:
+1. Multi-language Natural Language Processing
+2. Regional Data Protection Compliance (GDPR, CCPA, PDPA)
+3. Cross-cultural Query Pattern Recognition
+4. Global Performance Optimization
 - Regional compliance frameworks
 - Cross-platform optimization
 - Timezone and locale intelligence
