@@ -155,24 +155,24 @@ class SQLSynthesisAgent:
                     global_error_manager,
                     {"query_length": len(natural_language_query), "model": self.model_name},
                 ):
-                # Advanced input validation
-                validation_result = global_validator.validate_natural_language(natural_language_query)
-                if not validation_result.is_valid:
-                    error_issues = [issue for issue in validation_result.issues
-                                  if issue.severity in [ValidationSeverity.CRITICAL, ValidationSeverity.ERROR]]
-                    error_messages = [issue.message for issue in error_issues]
-                    msg = f"Input validation failed: {'; '.join(error_messages)}"
-                    raise ValueError(msg)
+                    # Advanced input validation
+                    validation_result = global_validator.validate_natural_language(natural_language_query)
+                    if not validation_result.is_valid:
+                        error_issues = [issue for issue in validation_result.issues
+                                      if issue.severity in [ValidationSeverity.CRITICAL, ValidationSeverity.ERROR]]
+                        error_messages = [issue.message for issue in error_issues]
+                        msg = f"Input validation failed: {'; '.join(error_messages)}"
+                        raise ValueError(msg)
 
-                # Log validation warnings
-                warning_issues = [issue for issue in validation_result.issues
-                                if issue.severity == ValidationSeverity.WARNING]
-                if warning_issues:
-                    warning_messages = [issue.message for issue in warning_issues]
-                    logger.warning(f"Input validation warnings: {'; '.join(warning_messages)}")
+                    # Log validation warnings
+                    warning_issues = [issue for issue in validation_result.issues
+                                    if issue.severity == ValidationSeverity.WARNING]
+                    if warning_issues:
+                        warning_messages = [issue.message for issue in warning_issues]
+                        logger.warning(f"Input validation warnings: {'; '.join(warning_messages)}")
 
-                # Basic input validation (legacy)
-                self._validate_input(natural_language_query)
+                    # Basic input validation (legacy)
+                    self._validate_input(natural_language_query)
 
                 # Generate SQL using LangChain agent with infinite scaling
                 result = await execute_with_infinite_scaling(
