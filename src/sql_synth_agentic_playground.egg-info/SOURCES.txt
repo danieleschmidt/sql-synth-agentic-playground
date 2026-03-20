@@ -1,0 +1,12 @@
+README.md
+pyproject.toml
+src/sql_synth/__init__.py
+src/sql_synth/benchmark.py
+src/sql_synth/db.py
+src/sql_synth/nl2sql.py
+src/sql_synth_agentic_playground.egg-info/PKG-INFO
+src/sql_synth_agentic_playground.egg-info/SOURCES.txt
+src/sql_synth_agentic_playground.egg-info/dependency_links.txt
+src/sql_synth_agentic_playground.egg-info/requires.txt
+src/sql_synth_agentic_playground.egg-info/top_level.txt
+tests/test_sql_synth.py

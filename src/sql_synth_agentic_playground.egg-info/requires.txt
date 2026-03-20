@@ -1,0 +1,7 @@
+
+[bench]
+sqlite-utils>=3.35
+
+[ui]
+streamlit>=1.32.0
+pandas>=2.0.0

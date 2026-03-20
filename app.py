@@ -1,508 +1,156 @@
-"""Main Streamlit application for SQL Synthesis Agent.
+"""SQL Synth Agentic Playground — Streamlit UI."""
+import sys
+import os
 
-This is the entry point for the Streamlit web application that provides
-an interactive interface for converting natural language to SQL.
-"""
+# Add src to path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
-import logging
-import uuid
-from typing import Optional
+try:
+    import streamlit as st
+except ImportError:
+    print("Streamlit not installed. Run: pip install streamlit")
+    sys.exit(1)
 
-import pandas as pd
-import streamlit as st
+from sql_synth.nl2sql import translate
+from sql_synth.benchmark import run_benchmark, SPIDER_SUBSET
+from sql_synth.db import create_demo_db, execute_sql
 
-from src.sql_synth.database import DatabaseManager, get_database_manager
-from src.sql_synth.logging_config import get_logger, setup_logging
-from src.sql_synth.advanced_cache import get_cached_generation_result, cache_generation_result, get_cache_statistics
-from src.sql_synth.monitoring import record_metric, get_monitoring_dashboard
-from src.sql_synth.streamlit_ui import (
-    StreamlitUI,
-    configure_page,
-    render_connection_status,
-    render_sidebar_info,
+# Page config
+st.set_page_config(
+    page_title="SQL Synth Agentic Playground",
+    page_icon="🔍",
+    layout="wide",
 )
 
-# Initialize enhanced logging
-setup_logging(
-    level="INFO",
-    enable_json=False,  # Use readable format for development
-    enable_security_log=True,
-    enable_performance_log=True,
-)
+st.title("🔍 SQL Synth Agentic Playground")
+st.markdown("*Natural language to SQL translation with benchmark evaluation*")
 
-logger = get_logger(__name__)
+# Sidebar
+with st.sidebar:
+    st.header("⚙️ Settings")
+    show_confidence = st.checkbox("Show confidence scores", value=True)
+    st.markdown("---")
+    st.markdown("**Demo Tables:**")
+    st.code("employee, product, customer")
 
-# Set up correlation ID for request tracing
-if "correlation_id" not in st.session_state:
-    st.session_state.correlation_id = str(uuid.uuid4())[:8]
+# Main tabs
+tab1, tab2, tab3 = st.tabs(["🔤 Translate", "📊 Benchmark", "🗄️ Execute"])
 
-
-def initialize_session_state() -> None:
-    """Initialize Streamlit session state variables."""
-    if "db_manager" not in st.session_state:
-        st.session_state.db_manager = None
-    if "ui" not in st.session_state:
-        st.session_state.ui = None
-    if "query_history" not in st.session_state:
-        st.session_state.query_history = []
-
-
-def setup_database_connection() -> Optional[DatabaseManager]:
-    """Set up database connection from environment variables.
-
-    Returns:
-        DatabaseManager instance if successful, None otherwise
-    """
-    try:
-        db_manager = get_database_manager()
-    except Exception as e:
-        logger.exception("Failed to create database manager")
-        st.error(f"Database configuration error: {e}")
-        st.info("Please check your environment variables in .env file")
-        return None
-    else:
-        logger.info("Database manager created successfully")
-        return db_manager
-
-
-def demo_mode_warning() -> None:
-    """Show demo mode warning if no database is configured."""
-    st.warning("""
-    🚧 **Demo Mode**: No database connection configured.
-
-    To use the full functionality:
-    1. Create a `.env` file based on `.env.example`
-    2. Set your database connection details
-    3. Restart the application
-    """)
-
-
-def simulate_sql_generation(user_query: str) -> str:
-    """Simulate SQL generation for demo purposes.
-
-    Args:
-        user_query: Natural language query from user
-
-    Returns:
-        Simulated SQL query
-    """
-    # Simple demo SQL generation based on keywords
-    query_lower = user_query.lower()
-
-    if "users" in query_lower:
-        if "active" in query_lower:
-            return (
-                "SELECT * FROM users WHERE status = 'active' "
-                "ORDER BY created_at DESC;"
-            )
-        return "SELECT * FROM users ORDER BY created_at DESC LIMIT 100;"
-    if "orders" in query_lower:
-        if "today" in query_lower or "recent" in query_lower:
-            return (
-                "SELECT * FROM orders WHERE DATE(created_at) = CURRENT_DATE "
-                "ORDER BY created_at DESC;"
-            )
-        return "SELECT * FROM orders ORDER BY created_at DESC LIMIT 50;"
-    if "products" in query_lower:
-        if "top" in query_lower or "best" in query_lower:
-            return (
-                "SELECT p.name, SUM(oi.quantity) as total_sold FROM products p "
-                "JOIN order_items oi ON p.id = oi.product_id "
-                "GROUP BY p.id ORDER BY total_sold DESC LIMIT 10;"
-            )
-        return "SELECT * FROM products WHERE active = true ORDER BY name;"
-    return (
-        f"-- Query: {user_query}\n"
-        "SELECT 'Demo query generation' as message, "
-        "'Configure database connection for real SQL synthesis' as note;"
-    )
-
-
-def create_demo_results(sql_query: str) -> pd.DataFrame:
-    """Create demo results for display.
-
-    Args:
-        sql_query: SQL query to create demo results for
-
-    Returns:
-        Demo DataFrame with sample data
-    """
-    if "users" in sql_query.lower():
-        return pd.DataFrame({
-            "id": [1, 2, 3],
-            "name": ["Alice Johnson", "Bob Smith", "Carol Davis"],
-            "email": ["alice@example.com", "bob@example.com", "carol@example.com"],
-            "status": ["active", "active", "inactive"],
-            "created_at": ["2024-01-15", "2024-01-20", "2024-01-10"],
-        })
-    if "orders" in sql_query.lower():
-        return pd.DataFrame({
-            "id": [101, 102, 103],
-            "user_id": [1, 2, 1],
-            "total": [25.99, 45.50, 15.00],
-            "status": ["completed", "pending", "completed"],
-            "created_at": ["2024-01-25", "2024-01-25", "2024-01-24"],
-        })
-    if "products" in sql_query.lower():
-        return pd.DataFrame({
-            "name": ["Laptop", "Mouse", "Keyboard"],
-            "total_sold": [15, 45, 30],
-            "category": ["Electronics", "Accessories", "Accessories"],
-        })
-    return pd.DataFrame({
-        "message": ["Demo query generation"],
-        "note": ["Configure database connection for real SQL synthesis"],
-    })
-
-
-def main() -> None:
-    """Main application function."""
-    # Configure page
-    configure_page()
-
-    # Initialize session state
-    initialize_session_state()
-
-    # Try to set up database connection
-    if st.session_state.db_manager is None:
-        st.session_state.db_manager = setup_database_connection()
-
-    # Initialize UI
-    if st.session_state.ui is None and st.session_state.db_manager is not None:
-        st.session_state.ui = StreamlitUI(st.session_state.db_manager)
-
-    # Check if we're in demo mode
-    demo_mode = st.session_state.db_manager is None
-
-    # Render sidebar
-    render_sidebar_info()
-
-    if not demo_mode:
-        render_connection_status(st.session_state.db_manager)
-    else:
-        st.sidebar.error("❌ No Database Connection")
-        st.sidebar.markdown("**Demo Mode Active**")
-
-    # Main content
-    if demo_mode:
-        demo_mode_warning()
-        # Create a demo UI instance
-        ui = StreamlitUI(None)
-    else:
-        ui = st.session_state.ui
-
-    # Render header
-    ui.render_header()
-
-    # Render input form
-    user_query, submit_clicked = ui.render_input_form()
-
-    # Process query when submitted
-    if submit_clicked and user_query.strip():
-        import time
-        start_time = time.time()
-        
-        # Log query initiation
-        logger.log_query_generation(
-            user_query=user_query,
-            generated_sql=None,
-            success=False,
-            generation_time=0,
-            operation="query_initiated"
+# ─── Tab 1: Translate ───────────────────────────────────────────────────────
+with tab1:
+    st.header("Natural Language → SQL")
+    
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        query = st.text_input(
+            "Enter your query in plain English:",
+            placeholder="e.g. Show all employees where salary > 80000",
         )
+    with col2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        translate_btn = st.button("Translate", type="primary")
+
+    # Quick examples
+    st.markdown("**Quick examples:**")
+    examples = [
+        "List all employees",
+        "Show employees where salary > 80000",
+        "How many customers are there",
+        "Get the top 5 products",
+        "Show employees ordered by salary desc",
+        "What is the average salary of employees",
+    ]
+    cols = st.columns(3)
+    for i, ex in enumerate(examples):
+        if cols[i % 3].button(ex, key=f"ex_{i}"):
+            query = ex
+            translate_btn = True
+
+    if query and translate_btn:
+        result = translate(query)
         
-        try:
-            # Comprehensive input validation and security check
-            from src.sql_synth.input_validation import validate_user_input
-            
-            validation_result = validate_user_input(user_query)
-            
-            if not validation_result.is_valid:
-                logger.log_security_event(
-                    event_type="input_validation_failed",
-                    severity=validation_result.risk_level,
-                    description=f"Input validation failed: {', '.join(validation_result.violations)}",
-                    user_input=user_query,
-                    confidence=validation_result.confidence
-                )
-                
-                if validation_result.risk_level in ["high", "critical"]:
-                    ui.show_error("⚠️ Input contains potentially malicious content and has been blocked for security reasons.")
-                    return
-                else:
-                    ui.show_warning(f"⚠️ Input validation issues detected: {', '.join(validation_result.violations)}")
-            
-            # Use sanitized input for processing
-            processed_query = validation_result.sanitized_input
-            
-            with st.spinner("Generating SQL..."):
-                generation_start = time.time()
-                
-                # Check cache first
-                cached_result = get_cached_generation_result(processed_query)
-                if cached_result:
-                    generated_sql = cached_result["sql_query"]
-                    metadata = cached_result.get("metadata", {})
-                    generation_time = time.time() - generation_start
-                    
-                    logger.log_query_generation(
-                        user_query=processed_query,
-                        generated_sql=generated_sql,
-                        success=True,
-                        generation_time=generation_time,
-                        mode="cache_hit"
-                    )
-                    
-                    ui.show_success(f"🚀 SQL retrieved from cache in {generation_time:.3f}s")
-                    record_metric("query.cache_hits", 1)
-                    
-                elif demo_mode:
-                    # Demo mode: simulate SQL generation
-                    generated_sql = simulate_sql_generation(processed_query)
-                    generation_time = time.time() - generation_start
-                    
-                    logger.log_query_generation(
-                        user_query=processed_query,
-                        generated_sql=generated_sql,
-                        success=True,
-                        generation_time=generation_time,
-                        mode="demo"
-                    )
-                    
-                    # Cache demo results
-                    cache_generation_result(processed_query, generated_sql, {"mode": "demo"})
-                    
-                    ui.show_info("⚠️ Demo mode: SQL generated using simple rules")
-                else:
-                    # Real mode: Use actual SQL synthesis agent
-                    from src.sql_synth.agent import AgentFactory
-                    from src.sql_synth.error_handling import error_context, ErrorCategory, ErrorSeverity
-                    
-                    try:
-                        with error_context("agent_creation", ErrorCategory.SQL_GENERATION, ErrorSeverity.HIGH):
-                            agent = AgentFactory.create_agent(st.session_state.db_manager)
-                            
-                        with error_context("sql_generation", ErrorCategory.SQL_GENERATION, ErrorSeverity.MEDIUM):
-                            result = agent.generate_sql(user_query)
-                            
-                        generation_time = time.time() - generation_start
-                        
-                        if result["success"]:
-                            generated_sql = result["sql_query"]
-                            metadata = result.get("metadata", {})
-                            
-                            # Cache the successful result
-                            cache_generation_result(processed_query, generated_sql, metadata)
-                            
-                            logger.log_query_generation(
-                                user_query=processed_query,
-                                generated_sql=generated_sql,
-                                success=True,
-                                generation_time=generation_time,
-                                mode="agent",
-                                model=result.get("model_used"),
-                                tokens=result.get("token_count")
-                            )
-                            
-                            record_metric("query.generation_time", generation_time)
-                            record_metric("query.cache_misses", 1)
-                            ui.show_success(f"SQL generated in {generation_time:.2f}s")
-                        else:
-                            logger.log_query_generation(
-                                user_query=user_query,
-                                generated_sql=None,
-                                success=False,
-                                generation_time=generation_time,
-                                error=result["error"]
-                            )
-                            
-                            ui.show_error(f"SQL generation failed: {result['error']}")
-                            generated_sql = None
-                            
-                    except Exception as e:
-                        generation_time = time.time() - generation_start
-                        
-                        logger.log_error(
-                            error=e,
-                            context={
-                                "operation": "agent_creation_or_generation",
-                                "user_query": user_query[:100],
-                                "generation_time": generation_time
-                            }
-                        )
-                        
-                        ui.show_error(f"Agent initialization failed: {e}")
-                        
-                        # Fallback to demo mode for graceful degradation
-                        generated_sql = simulate_sql_generation(user_query)
-                        logger.log_query_generation(
-                            user_query=user_query,
-                            generated_sql=generated_sql,
-                            success=True,
-                            generation_time=generation_time,
-                            mode="fallback_demo",
-                            error=str(e)
-                        )
-
-                # Display generated SQL with metadata
-                metadata = result.get('metadata', {}) if not demo_mode and isinstance(result, dict) else {}
-                ui.render_sql_output(generated_sql, metadata)
-
-                # Execute query and show results
-                if generated_sql:
-                    with st.spinner("Executing query..."):
-                        if demo_mode:
-                            # Demo mode: create fake results
-                            results = create_demo_results(generated_sql)
-                            ui.show_success("Demo results generated successfully!")
-                        else:
-                            # Real mode: execute against database using agent
-                            try:
-                                from src.sql_synth.agent import AgentFactory
-                                agent = AgentFactory.create_agent(st.session_state.db_manager)
-                                exec_result = agent.execute_sql(generated_sql)
-                                if exec_result["success"]:
-                                    if "rows" in exec_result:
-                                        results = pd.DataFrame(exec_result["rows"])
-                                        ui.show_success(f"Query executed successfully! ({exec_result['row_count']} rows in {exec_result['execution_time']:.2f}s)")
-                                    else:
-                                        results = pd.DataFrame({"message": [exec_result.get("message", "Query executed successfully")]})
-                                        ui.show_success("Query executed successfully!")
-                                else:
-                                    ui.show_error(f"Query execution failed: {exec_result['error']}")
-                                    results = None
-                            except Exception as e:
-                                logger.exception("Query execution failed")
-                                ui.show_error(f"Execution failed: {e}")
-                                results = None
-                else:
-                    results = None
-
-                    # Display results with execution metadata
-                    execution_metadata = exec_result if not demo_mode and 'exec_result' in locals() else {}
-                    ui.render_results(results, execution_metadata)
-                    
-                    # Update session state with metrics and performance data
-                    if not demo_mode and 'agent' in locals():
-                        st.session_state.agent_metrics = agent.get_metrics()
-                        st.session_state.last_query_complexity = ui._estimate_complexity(generated_sql)
-                        
-                        # Update performance stats
-                        if not hasattr(st.session_state, 'performance_stats'):
-                            st.session_state.performance_stats = {
-                                'total_queries': 0,
-                                'total_gen_time': 0,
-                                'total_exec_time': 0,
-                                'cache_hits': 0
-                            }
-                        
-                        stats = st.session_state.performance_stats
-                        stats['total_queries'] += 1
-                        if 'result' in locals() and isinstance(result, dict):
-                            stats['total_gen_time'] += result.get('generation_time', 0)
-                        if 'exec_result' in locals() and isinstance(exec_result, dict):
-                            stats['total_exec_time'] += exec_result.get('execution_time', 0)
-                        
-                        # Calculate averages
-                        stats['avg_gen_time'] = stats['total_gen_time'] / stats['total_queries']
-                        stats['avg_exec_time'] = stats['total_exec_time'] / stats['total_queries']
-                        stats['cache_hit_rate'] = stats['cache_hits'] / stats['total_queries']
-
-                    # Add to enhanced query history
-                    history_entry = {
-                        "user_query": user_query,
-                        "generated_sql": generated_sql,
-                        "timestamp": pd.Timestamp.now(),
-                        "success": True,
-                        "row_count": len(results) if results is not None else 0,
-                        "complexity": getattr(st.session_state, 'last_query_complexity', 'Unknown'),
-                        "generation_time": result.get('generation_time', 0) if not demo_mode and isinstance(result, dict) else 0,
-                        "execution_time": exec_result.get('execution_time', 0) if not demo_mode and 'exec_result' in locals() and isinstance(exec_result, dict) else 0
-                    }
-                    st.session_state.query_history.append(history_entry)
-
-        except Exception as e:
-            logger.exception("Error processing query")
-            ui.show_error(f"Failed to process query: {e}")
-
-    # Show enhanced query history in sidebar
-    if st.session_state.query_history:
-        st.sidebar.markdown("---")
-        st.sidebar.subheader("📝 Recent Queries")
+        st.markdown("### Result")
+        st.code(result.sql, language="sql")
         
-        # Summary metrics
-        total_queries = len(st.session_state.query_history)
-        successful_queries = sum(1 for entry in st.session_state.query_history if entry.get('success', True))
-        avg_gen_time = sum(entry.get('generation_time', 0) for entry in st.session_state.query_history) / total_queries
-        
-        st.sidebar.metric("Total Queries", total_queries)
-        st.sidebar.metric("Success Rate", f"{successful_queries/total_queries:.1%}")
-        st.sidebar.metric("Avg Gen Time", f"{avg_gen_time:.2f}s")
-        
-        # Recent queries
-        for i, entry in enumerate(reversed(st.session_state.query_history[-5:])):
-            query_num = len(st.session_state.query_history) - i
-            complexity = entry.get('complexity', 'Unknown')
-            success_icon = "✅" if entry.get('success', True) else "❌"
-            
-            with st.sidebar.expander(f"{success_icon} Query {query_num} ({complexity})"):
-                st.sidebar.write(f"**Input:** {entry['user_query'][:50]}...")
-                st.sidebar.write(f"**Rows:** {entry.get('row_count', 0)}")
-                st.sidebar.write(f"**Time:** {entry.get('generation_time', 0):.2f}s gen + {entry.get('execution_time', 0):.2f}s exec")
-                
-                # Truncate long SQL queries
-                MAX_SQL_DISPLAY = 100
-                sql_display = (
-                    entry["generated_sql"][:MAX_SQL_DISPLAY] + "..."
-                    if len(entry["generated_sql"]) > MAX_SQL_DISPLAY
-                    else entry["generated_sql"]
-                )
-                st.sidebar.code(sql_display, language="sql")
+        if show_confidence:
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Confidence", f"{result.confidence:.0%}")
+            col2.metric("Method", result.method)
+            col3.metric("Query Length", f"{len(query)} chars")
 
-    # Performance Dashboard
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("⚡ Performance Dashboard")
+# ─── Tab 2: Benchmark ────────────────────────────────────────────────────────
+with tab2:
+    st.header("Benchmark Evaluation")
+    st.markdown(f"Testing against {len(SPIDER_SUBSET)} Spider-style examples")
     
-    try:
-        # Get cache statistics
-        cache_stats = get_cache_statistics()
-        query_cache_stats = cache_stats.get("query_cache", {})
+    if st.button("Run Benchmark", type="primary"):
+        with st.spinner("Running benchmark..."):
+            report = run_benchmark()
         
-        # Display cache metrics
-        hit_rate = query_cache_stats.get("hit_rate", 0)
-        st.sidebar.metric("Cache Hit Rate", f"{hit_rate:.1%}")
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Total Examples", report.total)
+        col2.metric("Exact Match", f"{report.exact_match_rate:.0%}")
+        col3.metric("Structural Match", f"{report.structural_match_rate:.0%}")
+        col4.metric("Avg Confidence", f"{report.avg_confidence:.0%}")
         
-        entry_count = query_cache_stats.get("entry_count", 0)
-        st.sidebar.metric("Cached Queries", entry_count)
-        
-        # Get monitoring dashboard data
-        monitoring_data = get_monitoring_dashboard()
-        system_status = monitoring_data.get("system_status", "unknown")
-        
-        status_color = {
-            "healthy": "🟢",
-            "warning": "🟡", 
-            "error": "🟠",
-            "critical": "🔴"
-        }.get(system_status, "⚫")
-        
-        st.sidebar.metric("System Status", f"{status_color} {system_status.title()}")
-        
-        # Show active alerts if any
-        active_alerts = monitoring_data.get("active_alerts", [])
-        if active_alerts:
-            st.sidebar.warning(f"⚠️ {len(active_alerts)} Active Alert(s)")
-            
-        # Performance metrics button
-        if st.sidebar.button("📊 Detailed Metrics"):
-            st.sidebar.json({
-                "cache_stats": cache_stats,
-                "monitoring": monitoring_data
-            })
+        st.markdown("### Detailed Results")
+        for r in report.results:
+            status = "✅" if r.structural_match else "❌"
+            with st.expander(f"{status} {r.example.question}"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown("**Gold SQL:**")
+                    st.code(r.example.gold_sql, language="sql")
+                with col2:
+                    st.markdown("**Predicted SQL:**")
+                    st.code(r.predicted_sql, language="sql")
+                st.markdown(
+                    f"Confidence: `{r.confidence:.0%}` | Method: `{r.method}` | "
+                    f"Exact: `{r.exact_match}` | Structural: `{r.structural_match}`"
+                )
+
+# ─── Tab 3: Execute ──────────────────────────────────────────────────────────
+with tab3:
+    st.header("Execute SQL on Demo Database")
+    st.info("A demo SQLite database with employee, product, and customer tables is pre-loaded.")
     
-    except Exception as e:
-        st.sidebar.error(f"Performance data unavailable: {e}")
+    demo_conn = create_demo_db()
+    
+    # NL to SQL + execute
+    nl_query = st.text_input(
+        "Natural language query:",
+        placeholder="e.g. List all employees",
+        key="exec_nl"
+    )
+    
+    if nl_query:
+        result = translate(nl_query)
+        sql_input = st.text_area("SQL (auto-generated, edit if needed):", value=result.sql, height=80)
+    else:
+        sql_input = st.text_area(
+            "Or enter SQL directly:",
+            value="SELECT * FROM employee",
+            height=80,
+        )
+    
+    if st.button("Execute", type="primary"):
+        if sql_input and not sql_input.startswith("--"):
+            try:
+                cursor = demo_conn.execute(sql_input)
+                rows = cursor.fetchall()
+                if rows:
+                    import pandas as pd
+                    cols = [d[0] for d in cursor.description]
+                    df = pd.DataFrame([dict(zip(cols, r)) for r in rows])
+                    st.success(f"✅ {len(rows)} row(s) returned")
+                    st.dataframe(df, use_container_width=True)
+                else:
+                    st.success("✅ Query executed successfully (no rows returned)")
+            except Exception as e:
+                st.error(f"❌ Error: {e}")
+        else:
+            st.warning("Please enter a valid SQL query")
 
 
 if __name__ == "__main__":
-    main()
+    pass  # Run with: streamlit run app.py

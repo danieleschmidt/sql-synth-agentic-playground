@@ -1,46 +1,78 @@
-# sql-synth-agentic-playground
+# SQL Synth Agentic Playground
 
-[![Build Status](https://img.shields.io/github/actions/workflow/status/danieleschmidt/sql-synth-agentic-playground/ci.yml?branch=main)](https://github.com/danieleschmidt/sql-synth-agentic-playground/actions)
-[![Coverage Status](https://img.shields.io/coveralls/github/danieleschmidt/sql-synth-agentic-playground)](https://coveralls.io/github/danieleschmidt/sql-synth-agentic-playground)
-[![License](https://img.shields.io/github/license/danieleschmidt/sql-synth-agentic-playground)](LICENSE)
-[![Version](https://img.shields.io/badge/version-v0.1.0-blue)](https://semver.org)
+Natural language to SQL translation with a benchmark evaluation framework and Streamlit UI. No LLM required — pure rule-based translation engine.
 
-An interactive playground for an agent that translates natural language queries into SQL. This project adds a comprehensive evaluation framework against standard benchmarks like Spider and WikiSQL, served via a Streamlit UI.
+## Features
 
-## ✨ Key Features
+- **NL→SQL Translation**: Regex pattern-based translator covering SELECT, WHERE, ORDER BY, LIMIT, GROUP BY, aggregates (COUNT/SUM/AVG/MAX/MIN)
+- **Benchmark Framework**: Evaluate against Spider-style examples, compute exact-match and structural-match rates
+- **Streamlit UI**: Interactive playground with translation, benchmark running, and SQL execution
+- **Demo Database**: Pre-loaded SQLite with employee, product, and customer tables
+- **No external deps** for core translation — just Python stdlib
 
-*   **Natural Language to SQL**: An agent capable of generating complex SQL queries from natural language prompts.
-*   **Comprehensive Evaluation**: Evaluates accuracy against the Spider and WikiSQL benchmarks.
-*   **Interactive UI**: A Streamlit interface for demonstrating and interacting with the agent.
-*   **SQL Dialect Support**: The agent can select connectors for different dialects. Test cases should account for quirks (e.g., Snowflake's double-quoted identifiers and `ILIKE`).
-*   **Fast CI Runs**: Caches the Spider/WikiSQL databases in a Docker volume to ensure benchmark runs are consistently fast.
+## Install
 
-## 🔐 Security
+```bash
+pip install -e ".[ui]"
+```
 
-**SQL Injection Guard**: All generated queries use parameterized bindings to prevent SQL injection vulnerabilities. Direct string formatting of user input into SQL queries is strictly forbidden. For reporting vulnerabilities, please refer to our organization's `SECURITY.md` file.
+## Usage
 
-## ⚡ Quick Start
+### Streamlit UI
 
-1.  Clone the repository and install dependencies: `pip install -r requirements.txt`.
-2.  Set up your database connection in a `.env` file.
-3.  Cache the benchmark databases: `docker compose up -d benchmark-db`.
-4.  Run the Streamlit app: `streamlit run app.py`.
+```bash
+streamlit run app.py
+```
 
-## 📈 Roadmap
+### Python API
 
-*   **v0.1.0**: Core SQL generation agent and Streamlit UI.
-*   **v0.2.0**: Integration of the Spider and WikiSQL evaluation benchmarks.
-*   **v0.3.0**: Support for more complex SQL features and database dialects.
+```python
+from sql_synth.nl2sql import translate
+from sql_synth.benchmark import run_benchmark
 
-## 🤝 Contributing
+# Translate a query
+result = translate("Show all employees where salary > 80000")
+print(result.sql)  # SELECT * FROM employee WHERE salary > 80000
 
-We welcome contributions! Please see our organization-wide `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md`. A `CHANGELOG.md` is maintained.
+# Run benchmark
+report = run_benchmark()
+print(f"Structural match rate: {report.structural_match_rate:.0%}")
+```
 
-## 📝 License
+## Supported Query Patterns
 
-This project is licensed under the MIT License. The Spider dataset is licensed under CC BY-SA 4.0.
+| Pattern | Example | Generated SQL |
+|---|---|---|
+| Select all | "List all employees" | `SELECT * FROM employee` |
+| Count | "How many customers" | `SELECT COUNT(*) FROM customer` |
+| Where equals | "Find users where country is USA" | `SELECT * FROM user WHERE country = 'USA'` |
+| Where > | "Find products where price > 50" | `SELECT * FROM product WHERE price > 50` |
+| Order by | "Show employees ordered by salary desc" | `SELECT * FROM employee ORDER BY salary DESC` |
+| Limit | "Get top 5 products" | `SELECT * FROM product LIMIT 5` |
+| Avg | "Average salary of employees" | `SELECT AVG(salary) FROM employee` |
+| Group by | "Count orders per status" | `SELECT status, COUNT(*) FROM order GROUP BY status` |
 
-## 📚 References
+## Benchmark
 
-*   **Spider Dataset**: [arXiv:1809.08887](https://arxiv.org/abs/1809.08887)
-*   **LangChain SQL Tool API**: [SQL Agent Toolkit Reference](https://api.python.langchain.com/en/latest/agents/langchain_community.agent_toolkits.sql.base.create_sql_agent.html)```
+The built-in benchmark includes 10 Spider-style examples. Run it via the UI or:
+
+```python
+from sql_synth.benchmark import run_benchmark
+report = run_benchmark()
+print(f"Exact match: {report.exact_match_rate:.0%}")
+print(f"Structural match: {report.structural_match_rate:.0%}")
+```
+
+You can also load custom examples:
+```python
+from sql_synth.benchmark import load_custom_benchmark, run_benchmark
+examples = load_custom_benchmark("my_benchmark.json")
+report = run_benchmark(examples)
+```
+
+## Development
+
+```bash
+pip install pytest
+pytest tests/
+```

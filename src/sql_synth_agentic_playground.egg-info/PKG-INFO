@@ -1,0 +1,10 @@
+Metadata-Version: 2.4
+Name: sql-synth-agentic-playground
+Version: 1.0.0
+Summary: NL→SQL translation with eval framework and Streamlit UI
+Requires-Python: >=3.9
+Provides-Extra: ui
+Requires-Dist: streamlit>=1.32.0; extra == "ui"
+Requires-Dist: pandas>=2.0.0; extra == "ui"
+Provides-Extra: bench
+Requires-Dist: sqlite-utils>=3.35; extra == "bench"
